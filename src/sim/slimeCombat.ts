@@ -1,6 +1,6 @@
 import type { ArmySlime, ContactPatch, SlimeNode } from "./types";
 import { average, clamp, clamp01, distance, normalize, scale, sub } from "./vector";
-import { calculateLocalZoc } from "./zoc";
+import { calculateLocalZoc, sampleEnemyZoc } from "./zoc";
 import { ringIntegrity } from "./encirclement";
 
 function boundary(slime: ArmySlime): SlimeNode[] {
@@ -8,7 +8,7 @@ function boundary(slime: ArmySlime): SlimeNode[] {
 }
 
 export function buildContactPatches(own: ArmySlime, enemy: ArmySlime): ContactPatch[] {
-  const threshold = own.zocRadius * 0.45 + enemy.zocRadius * 0.45 + 28;
+  const threshold = enemy.zocRadius + 18;
   const pairs: Array<{ own: SlimeNode; enemy: SlimeNode; distance: number }> = [];
 
   for (const ownNode of boundary(own)) {
@@ -21,8 +21,9 @@ export function buildContactPatches(own: ArmySlime, enemy: ArmySlime): ContactPa
         nearestDistance = gap;
       }
     }
-    if (nearest && nearestDistance < threshold) {
-      pairs.push({ own: ownNode, enemy: nearest, distance: nearestDistance });
+    const zocSample = sampleEnemyZoc(enemy, ownNode.position);
+    if (nearest && (zocSample.insideBody || zocSample.distance < threshold)) {
+      pairs.push({ own: ownNode, enemy: nearest, distance: zocSample.distance });
     }
   }
 
