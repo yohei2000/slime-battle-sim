@@ -1,11 +1,20 @@
 import type { ArmySlime, SlimeOrder } from "./types";
-import { clamp, distance } from "./vector";
+import { clamp, distance, dot, normalize } from "./vector";
 
 export function calculateCommandDelay(slime: ArmySlime, order: Omit<SlimeOrder, "executeAt" | "status">): number {
   const shapeChange =
     Math.abs((order.targetWidth ?? slime.desiredWidth) - slime.currentWidth) / 180 +
     Math.abs((order.targetDepth ?? slime.desiredDepth) - slime.currentDepth) / 150 +
-    distance(order.targetCenter ?? slime.center, slime.center) / 550;
+    distance(order.targetCenter ?? slime.center, slime.center) / 550 +
+    (Math.abs(order.targetLeftWingAdvance ?? slime.desiredLeftWingAdvance) +
+      Math.abs(order.targetRightWingAdvance ?? slime.desiredRightWingAdvance)) /
+      260 +
+    (1 -
+      dot(
+        normalize(order.targetDirection ?? slime.desiredDirection),
+        normalize(slime.facing),
+      )) *
+      0.8;
 
   return clamp(
     0.22 +
@@ -44,11 +53,14 @@ export function updateOrder(slime: ArmySlime, now: number): void {
     if (order.targetCenter) slime.desiredCenter = { ...order.targetCenter };
     if (order.targetDirection) {
       slime.desiredDirection = { ...order.targetDirection };
-      slime.facing = { ...order.targetDirection };
     }
     if (order.targetWidth !== undefined) slime.desiredWidth = order.targetWidth;
     if (order.targetDepth !== undefined) slime.desiredDepth = order.targetDepth;
     if (order.targetDensity !== undefined) slime.desiredDensity = order.targetDensity;
+    if (order.targetLeftWingAdvance !== undefined)
+      slime.desiredLeftWingAdvance = order.targetLeftWingAdvance;
+    if (order.targetRightWingAdvance !== undefined)
+      slime.desiredRightWingAdvance = order.targetRightWingAdvance;
     if (order.posture === "breakthrough") slime.shockTimer = 2.4;
   }
 

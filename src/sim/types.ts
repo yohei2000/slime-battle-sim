@@ -68,6 +68,8 @@ export type SlimeOrder = {
   targetWidth?: number;
   targetDepth?: number;
   targetDensity?: number;
+  targetLeftWingAdvance?: number;
+  targetRightWingAdvance?: number;
   issuedAt: number;
   executeAt: number;
   status: "queued" | "transmitting" | "executing" | "blocked" | "completed";
@@ -87,6 +89,8 @@ export type ArmySlime = {
   desiredWidth: number;
   desiredDepth: number;
   desiredDensity: number;
+  desiredLeftWingAdvance: number;
+  desiredRightWingAdvance: number;
   currentWidth: number;
   currentDepth: number;
   currentDensity: number;
@@ -118,12 +122,26 @@ export type ArmySlime = {
 
 export type GesturePreviewState = {
   active: boolean;
-  mode: "none" | "drag" | "spread" | "contract" | "breakthrough" | "envelop";
+  mode:
+    | "none"
+    | "drag"
+    | "spread"
+    | "contract"
+    | "breakthrough"
+    | "envelop"
+    | "envelop-advance"
+    | "rotate"
+    | "left-wing"
+    | "right-wing";
   start?: Vector2Like;
   end?: Vector2Like;
   center?: Vector2Like;
   width?: number;
   depth?: number;
+  direction?: Vector2Like;
+  rotation?: number;
+  leftWingAdvance?: number;
+  rightWingAdvance?: number;
   confidence?: "高" | "中" | "低";
 };
 

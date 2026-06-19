@@ -32,6 +32,13 @@ function updateDesiredShape(slime: ArmySlime): void {
     const angle = (i / boundary.length) * Math.PI * 2;
     let forward = Math.cos(angle) * slime.desiredDepth * 0.5;
     const sideways = Math.sin(angle) * slime.desiredWidth * 0.5;
+    const leftWeight = clamp01(Math.sin(angle));
+    const rightWeight = clamp01(-Math.sin(angle));
+    const wingFrontBias = 0.35 + Math.max(0, Math.cos(angle)) * 0.65;
+    forward +=
+      (slime.desiredLeftWingAdvance * leftWeight +
+        slime.desiredRightWingAdvance * rightWeight) *
+      wingFrontBias;
     if (slime.posture === "envelop") {
       forward += Math.abs(Math.sin(angle)) * slime.desiredDepth * wingCurve;
     }

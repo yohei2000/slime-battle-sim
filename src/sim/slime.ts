@@ -124,6 +124,8 @@ export function createArmySlime(
     desiredWidth: width,
     desiredDepth: depth,
     desiredDensity: 1,
+    desiredLeftWingAdvance: 0,
+    desiredRightWingAdvance: 0,
     currentWidth: width,
     currentDepth: depth,
     currentDensity: 1,

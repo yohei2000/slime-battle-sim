@@ -32,6 +32,8 @@ export class DragIntentController {
       posture: slime.posture === "hold" ? "neutral" : slime.posture,
       targetCenter: add(slime.center, scale(direction, travel)),
       targetDirection: direction,
+      targetLeftWingAdvance: 0,
+      targetRightWingAdvance: 0,
       issuedAt: now,
     });
     this.reset();

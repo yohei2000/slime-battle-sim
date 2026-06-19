@@ -57,6 +57,8 @@ export function updateEnemyAI(enemy: ArmySlime, player: ArmySlime, now: number):
     targetWidth: clamp(shape.width, 145, 430),
     targetDepth: clamp(shape.depth, 112, 275),
     targetDensity: shape.density,
+    targetLeftWingAdvance: 0,
+    targetRightWingAdvance: 0,
     issuedAt: now,
   });
 }

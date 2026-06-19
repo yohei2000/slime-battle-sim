@@ -72,6 +72,7 @@ export class MobileHUD {
     this.tacticalStats.setText(
       `姿勢 ${postureLabel(player.posture)}  密度 ${player.currentDensity.toFixed(2)}  幅 ${player.currentWidth.toFixed(0)}\n` +
         `疲労 ${player.fatigue.toFixed(0)}  圧力 ${player.pressure.toFixed(0)}  隙間 ${(player.gapRisk * 100).toFixed(0)}%  過密 ${(player.crowding * 100).toFixed(0)}%\n` +
+        `向き ${Math.round((Math.atan2(player.facing.y, player.facing.x) * 180) / Math.PI)}°  翼 L${player.desiredLeftWingAdvance.toFixed(0)} / R${player.desiredRightWingAdvance.toFixed(0)}\n` +
         `包囲力 ${(player.envelopPower * 100).toFixed(0)}  突破力 ${(player.breakthroughPower * 100).toFixed(0)}`,
     );
     const warnings: string[] = [];
