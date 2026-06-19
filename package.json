@@ -1,0 +1,18 @@
+{
+  "name": "slime-battle-sim",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --base=./",
+    "build": "tsc -b && vite build --base=./",
+    "preview": "vite preview --base=./"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5"
+  }
+}
