@@ -21,8 +21,8 @@ import {
 } from "./vector";
 
 const MAX_SPLIT_GENERATION = 2;
-const MIN_SPLIT_MASS = 42;
-const REQUIRED_LOCAL_BREAKS = 2;
+const MIN_SPLIT_MASS = 58;
+const REQUIRED_LOCAL_BREAKS = 5;
 const MIN_CHILD_NODES = 8;
 const MIN_CHILD_BOUNDARY_NODES = 3;
 
@@ -49,7 +49,7 @@ function uniqueLinks(slime: ArmySlime): SlimeLink[] {
 function fractureSamples(slime: ArmySlime): FractureSample[] {
   const byId = new Map(slime.nodes.map((node) => [node.id, node]));
   return uniqueLinks(slime)
-    .filter((link) => link.broken || link.integrity < 0.82)
+    .filter((link) => link.broken || link.integrity < 0.62)
     .flatMap((link) => {
       const a = byId.get(link.nodeAId);
       const b = byId.get(link.nodeBId);
@@ -73,7 +73,7 @@ export function updateSplitStress(slime: ArmySlime, dt: number): void {
     slime.fractureLinkCount = 0;
     slime.fractureCenter = { ...slime.center };
     slime.fractureNormal = { ...slime.facing };
-    slime.splitStress = Math.max(0, slime.splitStress - 0.22 * dt);
+    slime.splitStress = Math.max(0, slime.splitStress - 0.32 * dt);
     return;
   }
 
@@ -113,17 +113,17 @@ export function updateSplitStress(slime: ArmySlime, dt: number): void {
   slime.fractureLinkCount = strongestCluster.filter(
     (sample) => sample.link.broken,
   ).length;
-  slime.fractureConcentration = clamp01(strongestWeight / 2.7);
+  slime.fractureConcentration = clamp01(strongestWeight / 4.8);
 
   const targetProgress = clamp01(
-    slime.fractureConcentration * 0.82 +
-      clamp01(slime.fractureLinkCount / REQUIRED_LOCAL_BREAKS) * 0.28,
+    slime.fractureConcentration * 0.78 +
+      clamp01(slime.fractureLinkCount / REQUIRED_LOCAL_BREAKS) * 0.24,
   );
   slime.splitStress = clamp01(
     lerp(
       { x: slime.splitStress, y: 0 },
       { x: targetProgress, y: 0 },
-      clamp01(dt * 3.2),
+      clamp01(dt * 1.25),
     ).x,
   );
 }
@@ -133,8 +133,8 @@ export function shouldSplitSlime(slime: ArmySlime): boolean {
     slime.splitCooldown <= 0 &&
     slime.splitGeneration < MAX_SPLIT_GENERATION &&
     slime.mass >= MIN_SPLIT_MASS &&
-    slime.splitStress >= 0.72 &&
-    slime.fractureConcentration >= 0.68 &&
+    slime.splitStress >= 0.93 &&
+    slime.fractureConcentration >= 0.86 &&
     slime.fractureLinkCount >= REQUIRED_LOCAL_BREAKS
   );
 }

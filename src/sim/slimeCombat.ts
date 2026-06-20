@@ -52,7 +52,7 @@ export function buildContactPatches(own: ArmySlime, enemy: ArmySlime): ContactPa
       center,
       normal,
       length: pairs.length * 18,
-      pressure: pressure * 58,
+      pressure: pressure * 42,
       ownDensity,
       enemyDensity,
       ownFrontage: pairs.length / boundary(own).length,
@@ -139,6 +139,6 @@ export function contactPushForce(own: ArmySlime, enemy: ArmySlime, node: SlimeNo
   const enemyContainment = enemy.zocStrength * (0.65 + enemy.currentDensity * 0.35);
   return scale(
     normalize(sub(own.center, enemy.center)),
-    Math.max(0, enemyContainment - ownPower * 0.55) * patch.pressure * 0.022,
+    Math.max(0, enemyContainment - ownPower * 0.75) * patch.pressure * 0.0065,
   );
 }

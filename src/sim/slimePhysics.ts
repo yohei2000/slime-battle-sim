@@ -70,7 +70,7 @@ function localEnemyPressure(
     candidate.ownNodeIds.includes(node.id),
   );
   const contactLoad = patch
-    ? clamp01(patch.pressure / 48) * (0.72 + enemy.zocStrength * 0.28)
+    ? clamp01(patch.pressure / 62) * (0.52 + enemy.zocStrength * 0.2)
     : 0;
   const sample = sampleEnemyZoc(enemy, node.position);
   const pressureRange = sample.clearance + 14;
@@ -78,10 +78,10 @@ function localEnemyPressure(
     ? 1
     : clamp01((pressureRange - sample.distance) / pressureRange);
   return clamp(
-    (contactLoad * 0.72 + zocCompression * 0.38) *
+    (contactLoad * 0.45 + zocCompression * 0.22) *
       (0.7 + enemy.currentDensity * 0.3),
     0,
-    1.25,
+    0.95,
   );
 }
 
@@ -146,7 +146,7 @@ function applySpringForces(
         link.recoveryDelay = 2.2;
         link.integrity -=
           (link.stress - slime.effectiveToughness) *
-          1 *
+          0.42 *
           (1 + (100 - slime.cohesion) / 120) *
           dt;
       } else {
@@ -232,15 +232,15 @@ function applyZocForces(slime: ArmySlime, enemy: ArmySlime, forces: ForceMap): v
           ? 0.018
           : 0.035;
     const barrierStrength =
-      (8 + enemy.zocStrength * 13) *
+      (3.2 + enemy.zocStrength * 6.5) *
       proximity *
-      (1 + Math.max(0, sample.penetration) / Math.max(1, sample.clearance));
+      (1 + Math.max(0, sample.penetration) / Math.max(1, sample.clearance) * 0.38);
 
     addForce(
       forces,
       node,
       add(
-        scale(sample.outwardNormal, barrierStrength + Math.abs(inwardFlow) * 0.12),
+        scale(sample.outwardNormal, barrierStrength + Math.abs(inwardFlow) * 0.04),
         scale(tangentFlow, slideFactor * proximity),
       ),
     );
@@ -266,7 +266,7 @@ function enforceZocBoundary(slime: ArmySlime, enemy: ArmySlime): void {
     if (!sample.insideZoc) continue;
 
     contactNormals.push(sample.outwardNormal);
-    node.position = projectOutsideEnemyZoc(enemy, node.position, 1, 18);
+    node.position = projectOutsideEnemyZoc(enemy, node.position, 1, 10);
     const normalVelocity = dot(node.velocity, sample.outwardNormal);
     const tangentVelocity = sub(
       node.velocity,
@@ -276,7 +276,7 @@ function enforceZocBoundary(slime: ArmySlime, enemy: ArmySlime): void {
       normalVelocity > 0 ? scale(sample.outwardNormal, normalVelocity * 0.35) : { x: 0, y: 0 };
     node.velocity = add(scale(tangentVelocity, 0.9), outwardVelocity);
     node.localPressure = clamp(
-      node.localPressure + Math.max(0, sample.penetration) * 2.4 + 12,
+      node.localPressure + Math.max(0, sample.penetration) * 1.1 + 5,
       0,
       100,
     );
