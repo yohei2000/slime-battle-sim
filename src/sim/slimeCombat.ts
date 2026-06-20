@@ -71,15 +71,17 @@ function combatPower(slime: ArmySlime, patch: ContactPatch, own: boolean): numbe
     slime.isRouting
       ? 0.42
       : slime.posture === "breakthrough"
-      ? 1.42
+      ? 1.26
       : slime.posture === "envelop"
-        ? 1.08
+        ? 1.13
         : slime.posture === "contract"
-          ? 1.18
+          ? 1.04
           : slime.posture === "spread"
-            ? 0.86
+            ? 0.94
             : 1;
   const shock = slime.shockTimer > 0 ? 1.25 : 1;
+  const crowdingEfficiency =
+    slime.currentDensity > 1.24 ? 1 - clamp01((slime.currentDensity - 1.24) / 0.58) * 0.22 : 1;
   return (
     activePower *
     density *
@@ -87,6 +89,7 @@ function combatPower(slime: ArmySlime, patch: ContactPatch, own: boolean): numbe
     (0.3 + slime.cohesion / 135) *
     postureFactor *
     shock *
+    crowdingEfficiency *
     (1 - slime.fatigue / 155)
   );
 }

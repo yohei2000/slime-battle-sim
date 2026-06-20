@@ -100,12 +100,17 @@ function applySpringForces(
   let linkCount = 0;
   let brokenCount = 0;
   let peakLocalStress = 0;
+  const isWidePosture = slime.posture === "spread" || slime.posture === "envelop";
+  const wideCohesionSupport = isWidePosture
+    ? 1 + clamp01((1.08 - slime.currentDensity) / 0.48) * 0.26
+    : 1;
   slime.effectiveToughness = clamp(
     slime.toughness *
       (0.55 + slime.cohesion * 0.0045) *
-      (0.72 + slime.morale * 0.0028),
+      (0.72 + slime.morale * 0.0028) *
+      wideCohesionSupport,
     0.18,
-    1.2,
+    1.42,
   );
   for (const node of slime.nodes) {
     for (const link of node.links) {
@@ -144,11 +149,17 @@ function applySpringForces(
 
       if (link.stress > slime.effectiveToughness) {
         link.recoveryDelay = 2.2;
+        const wideDamageDamping = isWidePosture
+          ? 0.34 + clamp01(link.localPressure - 0.42) * 0.36
+          : 1;
+        const integrityFloor = isWidePosture && link.localPressure < 0.78 ? 0.2 : 0;
         link.integrity -=
           (link.stress - slime.effectiveToughness) *
           0.42 *
+          wideDamageDamping *
           (1 + (100 - slime.cohesion) / 120) *
           dt;
+        link.integrity = Math.max(integrityFloor, link.integrity);
       } else {
         link.recoveryDelay = Math.max(0, link.recoveryDelay - dt);
       }
@@ -334,10 +345,24 @@ function integrateNodes(
   dt: number,
   bounds: { width: number; height: number },
 ): void {
+  const wideFormationDrag =
+    slime.posture === "spread" || slime.posture === "envelop"
+      ? 1 -
+        clamp01(
+          slime.gapRisk * 0.42 +
+            clamp01((1.02 - slime.currentDensity) / 0.5) * 0.26,
+        )
+      : 1;
   for (const node of slime.nodes) {
     const force = forces.get(node.id) ?? { x: 0, y: 0 };
     node.velocity = add(node.velocity, scale(force, dt * 60 / node.mass));
     node.velocity = scale(node.velocity, Math.pow(slime.viscosity, dt * 5.2));
+    if (wideFormationDrag < 1) {
+      node.velocity = scale(
+        node.velocity,
+        Math.pow(clamp(wideFormationDrag, 0.48, 1), dt * 4.4),
+      );
+    }
     const speed = length(node.velocity);
     if (speed > 88) node.velocity = scale(node.velocity, 88 / speed);
     node.position = add(node.position, scale(node.velocity, dt));
@@ -399,20 +424,23 @@ function updateDerivedStats(slime: ArmySlime, dt: number): void {
   );
   slime.crowding = Math.max(0, slime.currentDensity / 1.22 - 1);
   if (slime.crowding > 0) {
-    slime.fatigue += slime.crowding * 5 * dt;
-    slime.cohesion -= slime.crowding * 6 * dt;
+    const compactPosturePenalty =
+      slime.posture === "contract" || slime.posture === "breakthrough" ? 1.55 : 1;
+    slime.fatigue += slime.crowding * 6.8 * compactPosturePenalty * dt;
+    slime.cohesion -= slime.crowding * 7.5 * compactPosturePenalty * dt;
   }
   slime.breakthroughPower = clamp01(
-    slime.currentDensity * 0.34 +
+    slime.currentDensity * 0.25 +
       slime.morale / 330 +
       slime.cohesion / 420 +
-      (slime.posture === "breakthrough" ? 0.2 : 0),
+      (slime.posture === "breakthrough" ? 0.17 : 0) -
+      slime.crowding * 0.12,
   );
   slime.envelopPower = clamp01(
-    slime.currentWidth / 520 +
+    slime.currentWidth / 470 +
       slime.zocRadius / 190 +
       slime.cohesion / 420 -
-      slime.gapRisk * 0.28,
+      slime.gapRisk * 0.18,
   );
   slime.pressure = clamp(slime.pressure - (slime.isEngaged ? 0.5 : 7) * dt, 0, 100);
   slime.fatigue = clamp(slime.fatigue - (slime.isEngaged || slime.posture === "breakthrough" ? 0 : 0.7) * dt, 0, 100);

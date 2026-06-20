@@ -23,7 +23,7 @@ export function calculateCommandDelay(slime: ArmySlime, order: Omit<SlimeOrder, 
       (slime.isEngaged ? 0.32 : 0) +
       (100 - slime.cohesion) * 0.007 +
       shapeChange * 0.85 +
-      slime.crowding * 0.55,
+      slime.crowding * 0.9,
     0.18,
     2.8,
   );
