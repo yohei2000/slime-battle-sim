@@ -3,9 +3,11 @@ import { add, clamp, clamp01, distance, dot, normalize, scale, sub } from "./vec
 
 export type ZocBoundarySample = {
   closestPoint: Vector2Like;
+  zocClosestPoint: Vector2Like;
   outwardNormal: Vector2Like;
   distance: number;
   insideBody: boolean;
+  insideZoc: boolean;
   clearance: number;
   penetration: number;
 };
@@ -26,12 +28,11 @@ function closestPointOnSegment(
   return add(start, scale(segment, t));
 }
 
-function pointInsideBoundary(slime: ArmySlime, point: Vector2Like): boolean {
-  const nodes = boundary(slime);
+function pointInsidePolygon(points: Vector2Like[], point: Vector2Like): boolean {
   let inside = false;
-  for (let i = 0, j = nodes.length - 1; i < nodes.length; j = i, i += 1) {
-    const a = nodes[i].position;
-    const b = nodes[j].position;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i, i += 1) {
+    const a = points[i];
+    const b = points[j];
     const crosses =
       a.y > point.y !== b.y > point.y &&
       point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y || 0.0001) + a.x;
@@ -40,41 +41,107 @@ function pointInsideBoundary(slime: ArmySlime, point: Vector2Like): boolean {
   return inside;
 }
 
+function smoothClosed(points: Vector2Like[], passes = 2): Vector2Like[] {
+  let result = points.map((point) => ({ ...point }));
+  for (let pass = 0; pass < passes; pass += 1) {
+    const next: Vector2Like[] = [];
+    for (let i = 0; i < result.length; i += 1) {
+      const a = result[i];
+      const b = result[(i + 1) % result.length];
+      next.push(add(scale(a, 0.75), scale(b, 0.25)));
+      next.push(add(scale(a, 0.25), scale(b, 0.75)));
+    }
+    result = next;
+  }
+  return result;
+}
+
+function segmentOutwardNormal(
+  start: Vector2Like,
+  end: Vector2Like,
+  center: Vector2Like,
+): Vector2Like {
+  const tangent = normalize(sub(end, start));
+  const candidate = { x: -tangent.y, y: tangent.x };
+  const midpoint = scale(add(start, end), 0.5);
+  return dot(candidate, sub(midpoint, center)) >= 0
+    ? candidate
+    : scale(candidate, -1);
+}
+
+export function getBodyBoundaryPoints(slime: ArmySlime): Vector2Like[] {
+  return boundary(slime).map((node) => ({ ...node.position }));
+}
+
+export function getZocBoundaryPoints(
+  slime: ArmySlime,
+  clearanceScale = 1,
+): Vector2Like[] {
+  const body = getBodyBoundaryPoints(slime);
+  if (body.length < 3) return body;
+  const clearance = slime.zocRadius * clearanceScale;
+  const expanded = body.map((point, index) => {
+    const previous = body[(index - 1 + body.length) % body.length];
+    const next = body[(index + 1) % body.length];
+    const previousNormal = segmentOutwardNormal(previous, point, slime.center);
+    const nextNormal = segmentOutwardNormal(point, next, slime.center);
+    const averagedNormal = normalize(add(previousNormal, nextNormal));
+    const safeNormal =
+      dot(averagedNormal, sub(point, slime.center)) > 0.05
+        ? averagedNormal
+        : normalize(sub(point, slime.center));
+    return add(point, scale(safeNormal, clearance));
+  });
+  return smoothClosed(expanded);
+}
+
+function closestPolygonSample(
+  points: Vector2Like[],
+  center: Vector2Like,
+  point: Vector2Like,
+): {
+  closestPoint: Vector2Like;
+  distance: number;
+  outwardNormal: Vector2Like;
+} {
+  let closestPoint = points[0] ?? center;
+  let closestDistance = Number.POSITIVE_INFINITY;
+  let outwardNormal = normalize(sub(closestPoint, center));
+  for (let i = 0; i < points.length; i += 1) {
+    const start = points[i];
+    const end = points[(i + 1) % points.length];
+    const candidate = closestPointOnSegment(point, start, end);
+    const candidateDistance = distance(point, candidate);
+    if (candidateDistance < closestDistance) {
+      closestPoint = candidate;
+      closestDistance = candidateDistance;
+      outwardNormal = segmentOutwardNormal(start, end, center);
+    }
+  }
+  return { closestPoint, distance: closestDistance, outwardNormal };
+}
+
 export function sampleEnemyZoc(
   enemy: ArmySlime,
   point: Vector2Like,
   clearanceScale = 1,
 ): ZocBoundarySample {
-  const nodes = boundary(enemy);
-  let closestPoint = nodes[0]?.position ?? enemy.center;
-  let closestDistance = Number.POSITIVE_INFINITY;
-
-  for (let i = 0; i < nodes.length; i += 1) {
-    const candidate = closestPointOnSegment(
-      point,
-      nodes[i].position,
-      nodes[(i + 1) % nodes.length].position,
-    );
-    const candidateDistance = distance(point, candidate);
-    if (candidateDistance < closestDistance) {
-      closestPoint = candidate;
-      closestDistance = candidateDistance;
-    }
-  }
-
-  const insideBody = pointInsideBoundary(enemy, point);
-  const radialNormal = normalize(sub(closestPoint, enemy.center));
-  const pointNormal = normalize(sub(point, closestPoint));
-  const outwardNormal =
-    !insideBody && dot(pointNormal, radialNormal) > 0.1 ? pointNormal : radialNormal;
+  const bodyPoints = getBodyBoundaryPoints(enemy);
+  const zocPoints = getZocBoundaryPoints(enemy, clearanceScale);
+  const bodySample = closestPolygonSample(bodyPoints, enemy.center, point);
+  const zocSample = closestPolygonSample(zocPoints, enemy.center, point);
+  const insideBody = pointInsidePolygon(bodyPoints, point);
+  const insideZoc = insideBody || pointInsidePolygon(zocPoints, point);
   const clearance = enemy.zocRadius * clearanceScale;
-  const penetration = insideBody ? clearance + closestDistance : clearance - closestDistance;
+  const penetration = insideZoc ? zocSample.distance : -zocSample.distance;
 
   return {
-    closestPoint,
-    outwardNormal,
-    distance: closestDistance,
+    closestPoint: bodySample.closestPoint,
+    zocClosestPoint: zocSample.closestPoint,
+    outwardNormal: zocSample.outwardNormal,
+    distance: bodySample.distance,
     insideBody,
+    insideZoc,
     clearance,
     penetration,
   };
@@ -87,8 +154,11 @@ export function projectOutsideEnemyZoc(
   maxCorrection = Number.POSITIVE_INFINITY,
 ): Vector2Like {
   const sample = sampleEnemyZoc(enemy, point, clearanceScale);
-  if (!sample.insideBody && sample.penetration <= 0) return point;
-  const target = add(sample.closestPoint, scale(sample.outwardNormal, sample.clearance + 0.75));
+  if (!sample.insideZoc) return point;
+  const target = add(
+    sample.zocClosestPoint,
+    scale(sample.outwardNormal, 0.75),
+  );
   const correction = sub(target, point);
   const correctionLength = Math.hypot(correction.x, correction.y);
   if (correctionLength <= maxCorrection) return target;

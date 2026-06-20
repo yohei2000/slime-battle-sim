@@ -263,7 +263,7 @@ function enforceZocBoundary(slime: ArmySlime, enemy: ArmySlime): void {
   const contactNormals: Vector2Like[] = [];
   for (const node of slime.nodes.filter((candidate) => candidate.role !== "interior")) {
     const sample = sampleEnemyZoc(enemy, node.position);
-    if (!sample.insideBody && sample.penetration <= 0) continue;
+    if (!sample.insideZoc) continue;
 
     contactNormals.push(sample.outwardNormal);
     node.position = projectOutsideEnemyZoc(enemy, node.position, 1, 18);

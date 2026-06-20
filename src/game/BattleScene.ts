@@ -138,11 +138,13 @@ export class BattleScene extends Phaser.Scene {
     graphics.lineStyle(2, 0x315463, 0.45);
     graphics.strokeRoundedRect(28, 28, width - 56, height - 56, 24);
 
-    for (let i = 0; i < 14; i += 1) {
+    graphics.lineStyle(1, 0x23434d, 0.16);
+    for (let i = 0; i < 18; i += 1) {
       const x = 90 + ((i * 257) % (width - 180));
       const y = 90 + ((i * 173) % (height - 180));
-      graphics.fillStyle(0x17313a, 0.28);
-      graphics.fillCircle(x, y, 26 + (i % 4) * 12);
+      const length = 16 + (i % 4) * 5;
+      graphics.lineBetween(x - length, y - 4, x + length, y + 4);
+      graphics.lineBetween(x - length * 0.7, y + 7, x + length * 0.55, y + 12);
     }
     return graphics;
   }

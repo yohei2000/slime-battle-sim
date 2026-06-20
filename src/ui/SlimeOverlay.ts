@@ -16,6 +16,7 @@ import {
   scale,
   sub,
 } from "../sim/vector";
+import { getZocBoundaryPoints } from "../sim/zoc";
 
 const COLORS = {
   player: { fill: 0x28bde9, edge: 0x9ceeff, particle: 0xd9faff, zoc: 0x2dd4ef },
@@ -98,14 +99,9 @@ export class SlimeOverlay {
   private drawSlime(slime: ArmySlime, time: number): void {
     const color = COLORS[slime.side];
     const boundary = getBoundaryNodes(slime);
-    const rawPoints = boundary.map((node, index) => this.tensionPoint(slime, node, index, time));
+    const rawPoints = boundary.map((node) => ({ ...node.position }));
     const points = smoothClosed(rawPoints);
-    const zocPoints = smoothClosed(
-      rawPoints.map((point) => {
-        const radial = normalize({ x: point.x - slime.center.x, y: point.y - slime.center.y });
-        return add(point, scale(radial, slime.zocRadius));
-      }),
-    );
+    const zocPoints = getZocBoundaryPoints(slime);
 
     this.zocGraphics.fillStyle(color.zoc, 0.055);
     this.zocGraphics.lineStyle(1.5, color.zoc, 0.2);
@@ -396,13 +392,6 @@ export class SlimeOverlay {
         )
         .setScale(inverseZoom);
     }
-  }
-
-  private tensionPoint(slime: ArmySlime, node: SlimeNode, index: number, time: number): Vector2Like {
-    if (slime.tension < 0.28) return node.position;
-    const normal = normalize({ x: node.position.x - slime.center.x, y: node.position.y - slime.center.y });
-    const shake = Math.sin(time * 0.018 + index * 2.7) * slime.tension * 4.2;
-    return add(node.position, scale(normal, shake));
   }
 
   private drawFacing(slime: ArmySlime, color: number): void {
