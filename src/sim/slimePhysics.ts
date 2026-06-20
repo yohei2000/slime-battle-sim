@@ -143,16 +143,29 @@ function applySpringForces(
       peakLocalStress = Math.max(peakLocalStress, link.stress);
 
       if (link.stress > slime.effectiveToughness) {
+        link.recoveryDelay = 2.2;
         link.integrity -=
           (link.stress - slime.effectiveToughness) *
           1 *
           (1 + (100 - slime.cohesion) / 120) *
           dt;
-      } else if (
+      } else {
+        link.recoveryDelay = Math.max(0, link.recoveryDelay - dt);
+      }
+      if (
+        link.recoveryDelay <= 0 &&
         link.stress < slime.effectiveToughness * 0.58 &&
-        link.localPressure < 0.16
+        link.localPressure < 0.16 &&
+        link.integrity < 1
       ) {
-        link.integrity = Math.min(1, link.integrity + 0.025 * dt);
+        const repairFactor =
+          (0.35 + slime.cohesion / 140) *
+          (0.45 + slime.morale / 180) *
+          (slime.isEngaged ? 0.72 : 1);
+        link.integrity = Math.min(
+          1,
+          link.integrity + 0.075 * repairFactor * dt,
+        );
       }
       if (link.integrity <= 0) {
         link.integrity = 0;

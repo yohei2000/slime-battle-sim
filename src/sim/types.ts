@@ -25,6 +25,7 @@ export type SlimeLink = {
   integrity: number;
   stress: number;
   localPressure: number;
+  recoveryDelay: number;
   broken: boolean;
 };
 

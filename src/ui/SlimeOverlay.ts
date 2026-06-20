@@ -158,9 +158,10 @@ export class SlimeOverlay {
       const b = info.nodeB!.position;
       const load = info.loadRatio;
       const color = this.stressColor(load);
-      const pulse = load >= 1 ? 0.58 + Math.sin(time * 0.014) * 0.28 : 0.58;
-      const alpha = slime.isSelected || this.stressDetail ? pulse : pulse * 0.78;
-      const width = 1.2 + Math.min(5.8, load * 4.4);
+      const pulse = load >= 1 ? 0.34 + Math.sin(time * 0.014) * 0.1 : 0.26;
+      const alpha =
+        slime.isSelected || this.stressDetail ? pulse : pulse * 0.68;
+      const width = 0.65 + Math.min(2, load * 1.15);
       const segmentCount = 8;
       const damage = 1 - info.link.integrity;
 
@@ -175,11 +176,14 @@ export class SlimeOverlay {
 
       if (load >= 0.7) {
         const midpoint = lerp(a, b, 0.5);
-        this.effectGraphics.fillStyle(color, 0.08 + Math.min(0.18, load * 0.08));
+        this.effectGraphics.fillStyle(
+          color,
+          0.025 + Math.min(0.07, load * 0.035),
+        );
         this.effectGraphics.fillCircle(
           midpoint.x,
           midpoint.y,
-          14 + Math.min(18, load * 10),
+          9 + Math.min(10, load * 5),
         );
         this.drawPressureArrow(slime, midpoint, color, load);
       }
@@ -190,7 +194,7 @@ export class SlimeOverlay {
       const midpoint = lerp(info.nodeA.position, info.nodeB.position, 0.5);
       const aEnd = lerp(info.nodeA.position, midpoint, 0.72);
       const bEnd = lerp(info.nodeB.position, midpoint, 0.72);
-      this.effectGraphics.lineStyle(4, 0xff405d, 0.9);
+      this.effectGraphics.lineStyle(2.2, 0xff405d, 0.7);
       this.effectGraphics.lineBetween(
         info.nodeA.position.x,
         info.nodeA.position.y,
@@ -204,7 +208,7 @@ export class SlimeOverlay {
         bEnd.y,
       );
       this.effectGraphics.fillStyle(0x07131d, 0.95);
-      this.effectGraphics.fillCircle(midpoint.x, midpoint.y, 5);
+      this.effectGraphics.fillCircle(midpoint.x, midpoint.y, 3.5);
     }
 
     const critical = infos[0];
@@ -246,16 +250,20 @@ export class SlimeOverlay {
     const start = add(midpoint, scale(inward, -30));
     const end = add(midpoint, scale(inward, -5));
     const side = perpendicular(inward);
-    this.effectGraphics.lineStyle(2 + Math.min(4, loadRatio * 2), color, 0.86);
+    this.effectGraphics.lineStyle(
+      0.8 + Math.min(1.5, loadRatio * 0.8),
+      color,
+      0.55,
+    );
     this.effectGraphics.lineBetween(start.x, start.y, end.x, end.y);
     this.effectGraphics.fillStyle(color, 0.9);
     this.effectGraphics.fillTriangle(
       end.x,
       end.y,
-      end.x - inward.x * 9 + side.x * 5,
-      end.y - inward.y * 9 + side.y * 5,
-      end.x - inward.x * 9 - side.x * 5,
-      end.y - inward.y * 9 - side.y * 5,
+      end.x - inward.x * 7 + side.x * 3.5,
+      end.y - inward.y * 7 + side.y * 3.5,
+      end.x - inward.x * 7 - side.x * 3.5,
+      end.y - inward.y * 7 - side.y * 3.5,
     );
   }
 
@@ -270,9 +278,9 @@ export class SlimeOverlay {
       normalize(sub(center, slime.center));
     const direction = perpendicular(pressureDirection);
     const length = Math.min(slime.currentWidth, slime.currentDepth) * 0.62;
-    const pulse = 0.3 + Math.sin(time * 0.009) * 0.12;
+    const pulse = 0.2 + Math.sin(time * 0.009) * 0.06;
     const segments = 8;
-    this.effectGraphics.lineStyle(2, 0xffd166, pulse);
+    this.effectGraphics.lineStyle(1, 0xffd166, pulse);
     for (let i = 0; i < segments; i += 2) {
       const a = add(center, scale(direction, (i / segments - 0.5) * length));
       const b = add(

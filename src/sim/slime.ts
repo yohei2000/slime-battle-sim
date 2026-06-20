@@ -134,6 +134,7 @@ export function createArmySlime(
       integrity: 1,
       stress: 0,
       localPressure: 0,
+      recoveryDelay: 0,
       broken: false,
     };
     links.push(link);
