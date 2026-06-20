@@ -20,6 +20,7 @@ function weakPoint(player: ArmySlime, enemy: ArmySlime): Vector2Like {
 }
 
 export function updateEnemyAI(enemy: ArmySlime, player: ArmySlime, now: number): void {
+  if (enemy.isRouting) return;
   if (now < enemy.aiThinkAt || enemy.activeOrder?.status === "transmitting") return;
   enemy.aiThinkAt = now + 1.2 + Math.random() * 0.7;
 

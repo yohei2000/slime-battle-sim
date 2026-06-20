@@ -68,7 +68,9 @@ function combatPower(slime: ArmySlime, patch: ContactPatch, own: boolean): numbe
   const rearMass = Math.max(0, slime.mass - frontlineMass);
   const activePower = frontlineMass + rearMass * 0.15;
   const postureFactor =
-    slime.posture === "breakthrough"
+    slime.isRouting
+      ? 0.42
+      : slime.posture === "breakthrough"
       ? 1.42
       : slime.posture === "envelop"
         ? 1.08

@@ -100,7 +100,9 @@ export function calculateLocalZoc(slime: ArmySlime, node: SlimeNode, target: Sli
   const cohesionFactor = 0.35 + slime.cohesion / 150;
   const densityFactor = 0.55 + node.localDensity * 0.45;
   const postureFactor =
-    slime.posture === "breakthrough"
+    slime.isRouting
+      ? 0.38
+      : slime.posture === "breakthrough"
       ? 1.28
       : slime.posture === "contract"
         ? 1.18
@@ -117,7 +119,11 @@ export function updateZocStats(slime: ArmySlime): void {
   const cohesionFactor = 0.4 + slime.cohesion / 165;
   const densityFactor = 0.6 + Math.min(1.6, slime.currentDensity) * 0.38;
   const spreadFactor =
-    slime.posture === "spread" || slime.posture === "envelop" ? 0.82 : 1.08;
+    slime.isRouting
+      ? 0.42
+      : slime.posture === "spread" || slime.posture === "envelop"
+        ? 0.82
+        : 1.08;
   slime.zocStrength = moraleFactor * cohesionFactor * densityFactor * spreadFactor;
   slime.zocRadius = Math.min(
     88,

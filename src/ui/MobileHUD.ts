@@ -85,6 +85,7 @@ export class MobileHUD {
     if (player.isEncircling && ringIntegrity(player) < 0.46) warnings.push("包囲線が薄い");
     if (player.isEncircled) warnings.push("包囲されています");
     if (player.activeOrder?.status === "transmitting") warnings.push("命令伝達中");
+    if (player.isRouting) warnings.push("士気崩壊：敗走中");
     if (player.peakLocalStress > player.effectiveToughness)
       warnings.push("局所応力が靱性を超過");
     if (player.splitStress > 0.45) warnings.push("亀裂が連結しています");

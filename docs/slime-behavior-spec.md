@@ -274,6 +274,8 @@ ArmySlime
 | `isEngaged` | 派生 | 接触面が1つ以上存在する |
 | `isEncircling` | 派生 | 敵の包囲値が0.22超 |
 | `isEncircled` | 派生 | 自身の包囲値が0.62超 |
+| `isRouting` | 状態 | 士気崩壊による強制敗走中か |
+| `routedAt` | 状態 | 敗走を開始したシミュレーション時刻 |
 | `contactPatches` | 派生 | 現在の接触面 |
 | `activeOrder` | 制御 | 伝達中・実行中の命令 |
 | `commandDelay` | 派生 | 最新命令の伝達時間 |
@@ -1276,15 +1278,43 @@ shake =
 | `crowding > 0.18` | 中心に過密色、HUD警告 |
 | 包囲中かつ `ringIntegrity < 0.46` | HUD「包囲線が薄い」 |
 | `isEncircled` | HUD包囲警告 |
+| `isRouting` | 本体輪郭を黄色にし、頭上へ「敗走」を表示 |
+| `peakLocalStress > effectiveToughness` | HUD「局所応力が靱性を超過」 |
+
+### 21.7 スライム頭上表示
+
+各ArmySlimeの輪郭上端へ、カメラズームに依存しない画面サイズで次を表示する。
+
+```text
+兵力 round(mass)  士気 round(morale)
+```
+
+- 兵力は現在のArmySlimeの`mass`。分裂時は42:58へ分配され、総量を保存する。
+- 士気40以下は橙色、士気25以下または敗走中は黄色で表示する。
+- 敗走中は先頭へ「敗走」を追加する。
 
 ## 22. 勝敗
 
 | 条件 | 結果 |
 |---|---|
-| 自軍 `morale <= 3` または `cohesion <= 2` | 敵勝利 |
-| 敵軍 `morale <= 3` または `cohesion <= 2` | 自軍勝利 |
+| 自軍の全スライムが戦闘不能または敗走開始から5秒経過 | 敵勝利 |
+| 敵軍の全スライムが戦闘不能または敗走開始から5秒経過 | 自軍勝利 |
 
 質量0や粒子全滅による敗北は、現行実装には存在しない。
+
+### 22.1 敗走
+
+```text
+morale <= 25:
+  isRouting = true
+  posture = retreat
+  activeOrder = none
+  retreatDirection = normalize(ownCenter - enemyCenter)
+```
+
+敗走中はプレイヤー・敵AIの命令を受け付けず、敵から260先を継続的な移動目標にする。幅は基準幅の78%、奥行きは108%、密度目標は1.12となる。戦闘力補正は0.42、ZOC姿勢補正は0.38、ZOC全体補正は0.42。
+
+同陣営に戦闘可能な別スライムが残っている場合、敗走スライムは非交戦状態で最低8秒経過し、士気38以上まで回復すると`hold`へ立て直せる。
 
 ## 23. 実装保留・既知の制限
 
@@ -1385,6 +1415,7 @@ shake =
 | 包囲・ringIntegrity | `src/sim/encirclement.ts` |
 | リンク切断・分裂 | `src/sim/slimeSplit.ts` |
 | 敵AI | `src/sim/enemyAI.ts` |
+| 敗走開始・離脱方向・立て直し | `src/sim/routing.ts` |
 | 更新順・勝敗 | `src/sim/simulation.ts` |
 | 二本指判定 | `src/input/GestureAnalyzer.ts` |
 | 二本指命令変換 | `src/input/PinchGestureController.ts` |

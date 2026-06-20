@@ -32,7 +32,8 @@ export function calculateCommandDelay(slime: ArmySlime, order: Omit<SlimeOrder, 
 export function issueOrder(
   slime: ArmySlime,
   order: Omit<SlimeOrder, "executeAt" | "status">,
-): SlimeOrder {
+): SlimeOrder | undefined {
+  if (slime.isRouting) return undefined;
   const delay = calculateCommandDelay(slime, order);
   const activeOrder: SlimeOrder = {
     ...order,

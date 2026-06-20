@@ -162,6 +162,8 @@ export function createArmySlime(
     isEngaged: false,
     isEncircling: false,
     isEncircled: false,
+    isRouting: false,
+    routedAt: -1,
     contactPatches: [],
     activeOrder: undefined,
     encirclement: 0,

@@ -34,20 +34,31 @@ function drawPolygon(graphics: Phaser.GameObjects.Graphics, points: Vector2Like[
 }
 
 export class SlimeOverlay {
+  private readonly scene: Phaser.Scene;
   private readonly zocGraphics: Phaser.GameObjects.Graphics;
   private readonly bodyGraphics: Phaser.GameObjects.Graphics;
   private readonly particleGraphics: Phaser.GameObjects.Graphics;
   private readonly effectGraphics: Phaser.GameObjects.Graphics;
+  private readonly labelLayer: Phaser.GameObjects.Container;
+  private readonly labels = new Map<string, Phaser.GameObjects.Text>();
 
   constructor(scene: Phaser.Scene) {
+    this.scene = scene;
     this.zocGraphics = scene.add.graphics().setDepth(2);
     this.bodyGraphics = scene.add.graphics().setDepth(4);
     this.particleGraphics = scene.add.graphics().setDepth(5);
     this.effectGraphics = scene.add.graphics().setDepth(6);
+    this.labelLayer = scene.add.container(0, 0).setDepth(8);
   }
 
   objects(): Phaser.GameObjects.GameObject[] {
-    return [this.zocGraphics, this.bodyGraphics, this.particleGraphics, this.effectGraphics];
+    return [
+      this.zocGraphics,
+      this.bodyGraphics,
+      this.particleGraphics,
+      this.effectGraphics,
+      this.labelLayer,
+    ];
   }
 
   draw(slimes: ArmySlime[], time: number): void {
@@ -56,6 +67,7 @@ export class SlimeOverlay {
     this.particleGraphics.clear();
     this.effectGraphics.clear();
     for (const slime of slimes) this.drawSlime(slime, time);
+    this.updateLabels(slimes);
   }
 
   private drawSlime(slime: ArmySlime, time: number): void {
@@ -75,7 +87,11 @@ export class SlimeOverlay {
     drawPolygon(this.zocGraphics, zocPoints);
 
     this.bodyGraphics.fillStyle(color.fill, 0.2 + Math.min(0.24, slime.currentDensity * 0.1));
-    this.bodyGraphics.lineStyle(slime.isSelected ? 5 : 3, color.edge, slime.isSelected ? 0.98 : 0.75);
+    this.bodyGraphics.lineStyle(
+      slime.isSelected ? 5 : 3,
+      slime.isRouting ? 0xffd166 : color.edge,
+      slime.isSelected ? 0.98 : 0.75,
+    );
     drawPolygon(this.bodyGraphics, points);
 
     const coreRadius = 24 + slime.currentDensity * 8;
@@ -92,6 +108,56 @@ export class SlimeOverlay {
     this.drawFacing(slime, color.edge);
     this.drawWarnings(slime, boundary, time);
     this.drawContacts(slime, color.edge);
+  }
+
+  private updateLabels(slimes: ArmySlime[]): void {
+    const activeIds = new Set(slimes.map((slime) => slime.id));
+    for (const [id, label] of this.labels) {
+      if (activeIds.has(id)) continue;
+      label.destroy();
+      this.labels.delete(id);
+    }
+
+    const inverseZoom = 1 / Math.max(0.12, this.scene.cameras.main.zoom);
+    for (const slime of slimes) {
+      let label = this.labels.get(slime.id);
+      if (!label) {
+        label = this.scene.add
+          .text(0, 0, "", {
+            fontFamily: "Inter, Noto Sans JP, sans-serif",
+            fontSize: "14px",
+            fontStyle: "bold",
+            color: "#ffffff",
+            backgroundColor: "#07131ddd",
+            padding: { x: 7, y: 4 },
+            stroke: "#07131d",
+            strokeThickness: 2,
+          })
+          .setOrigin(0.5, 1)
+          .setResolution(2);
+        this.labelLayer.add(label);
+        this.labels.set(slime.id, label);
+      }
+
+      const top = Math.min(
+        ...getBoundaryNodes(slime).map((node) => node.position.y),
+      );
+      const moraleColor =
+        slime.isRouting || slime.morale <= 25
+          ? "#ffd166"
+          : slime.morale <= 40
+            ? "#ffb86b"
+            : slime.side === "player"
+              ? "#b8f4ff"
+              : "#ffd0da";
+      label
+        .setText(
+          `${slime.isRouting ? "敗走  " : ""}兵力 ${Math.round(slime.mass)}  士気 ${Math.round(slime.morale)}`,
+        )
+        .setColor(moraleColor)
+        .setPosition(slime.center.x, top - 12 * inverseZoom)
+        .setScale(inverseZoom);
+    }
   }
 
   private tensionPoint(slime: ArmySlime, node: SlimeNode, index: number, time: number): Vector2Like {

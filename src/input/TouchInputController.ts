@@ -59,7 +59,10 @@ export class TouchInputController {
       });
     }
     const slime = touched ?? this.selectedPlayer();
-    const tactical = Boolean(touched) || (slime.isSelected && pointInsideSlime(slime, world, 75));
+    const tactical =
+      !slime.isRouting &&
+      (Boolean(touched) ||
+        (slime.isSelected && pointInsideSlime(slime, world, 75)));
     this.pointers.set(pointer.id, {
       pointer,
       startScreen: { x: pointer.x, y: pointer.y },

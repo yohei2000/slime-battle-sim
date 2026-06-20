@@ -6,6 +6,7 @@ import { resolveCombat } from "./slimeCombat";
 import { updateEncirclement } from "./encirclement";
 import { updateEnemyAI } from "./enemyAI";
 import { splitArmySlime, shouldSplitSlime, updateSplitStress } from "./slimeSplit";
+import { updateRoutingState } from "./routing";
 import { distance } from "./vector";
 import type { ArmySlime } from "./types";
 
@@ -33,6 +34,15 @@ export class BattleSimulation {
     this.state.elapsed += dt;
     const players = this.state.playerSlimes;
     const enemies = this.state.enemySlimes;
+
+    for (const player of players) {
+      const enemy = this.nearest(player, enemies);
+      if (enemy) updateRoutingState(player, enemy, this.state.elapsed);
+    }
+    for (const enemy of enemies) {
+      const player = this.nearest(enemy, players);
+      if (player) updateRoutingState(enemy, player, this.state.elapsed);
+    }
 
     for (const slime of [...players, ...enemies]) {
       updateOrder(slime, this.state.elapsed);
@@ -77,10 +87,16 @@ export class BattleSimulation {
     this.state.enemy = this.nearest(this.state.player, this.state.enemySlimes) ?? this.state.enemySlimes[0];
 
     const playerAlive = this.state.playerSlimes.some(
-      (slime) => slime.morale > 3 && slime.cohesion > 2,
+      (slime) =>
+        slime.morale > 3 &&
+        slime.cohesion > 2 &&
+        (!slime.isRouting || this.state.elapsed - slime.routedAt < 5),
     );
     const enemyAlive = this.state.enemySlimes.some(
-      (slime) => slime.morale > 3 && slime.cohesion > 2,
+      (slime) =>
+        slime.morale > 3 &&
+        slime.cohesion > 2 &&
+        (!slime.isRouting || this.state.elapsed - slime.routedAt < 5),
     );
     if (!playerAlive) this.state.winner = "enemy";
     if (!enemyAlive) this.state.winner = "player";

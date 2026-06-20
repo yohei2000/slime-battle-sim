@@ -116,6 +116,8 @@ export type ArmySlime = {
   isEngaged: boolean;
   isEncircling: boolean;
   isEncircled: boolean;
+  isRouting: boolean;
+  routedAt: number;
   contactPatches: ContactPatch[];
   activeOrder?: SlimeOrder;
   encirclement: number;
