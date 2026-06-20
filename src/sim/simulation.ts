@@ -12,11 +12,11 @@ import type { ArmySlime } from "./types";
 
 export class BattleSimulation {
   readonly state: BattleState;
-  readonly bounds = { width: 1400, height: 900 };
+  readonly bounds = { width: 1000, height: 650 };
 
   constructor() {
-    const player = createArmySlime("azure-tide", "player", { x: 390, y: 450 }, { x: 1, y: 0 });
-    const enemy = createArmySlime("crimson-mire", "enemy", { x: 1010, y: 450 }, { x: -1, y: 0 });
+    const player = createArmySlime("azure-tide", "player", { x: 300, y: 325 }, { x: 1, y: 0 });
+    const enemy = createArmySlime("crimson-mire", "enemy", { x: 700, y: 325 }, { x: -1, y: 0 });
     this.state = {
       player,
       enemy,

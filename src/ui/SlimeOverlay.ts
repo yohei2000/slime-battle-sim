@@ -1,7 +1,21 @@
 import Phaser from "phaser";
 import type { ArmySlime, SlimeNode, Vector2Like } from "../sim/types";
 import { getBoundaryNodes } from "../sim/slime";
-import { add, normalize, perpendicular, scale } from "../sim/vector";
+import {
+  shortNodeName,
+  stressCause,
+  stressLinks,
+  type StressLinkInfo,
+} from "../sim/stressDiagnostics";
+import {
+  add,
+  clamp,
+  lerp,
+  normalize,
+  perpendicular,
+  scale,
+  sub,
+} from "../sim/vector";
 
 const COLORS = {
   player: { fill: 0x28bde9, edge: 0x9ceeff, particle: 0xd9faff, zoc: 0x2dd4ef },
@@ -41,6 +55,9 @@ export class SlimeOverlay {
   private readonly effectGraphics: Phaser.GameObjects.Graphics;
   private readonly labelLayer: Phaser.GameObjects.Container;
   private readonly labels = new Map<string, Phaser.GameObjects.Text>();
+  private readonly detailLabelLayer: Phaser.GameObjects.Container;
+  private causeLabel?: Phaser.GameObjects.Text;
+  private stressDetail = false;
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
@@ -49,6 +66,7 @@ export class SlimeOverlay {
     this.particleGraphics = scene.add.graphics().setDepth(5);
     this.effectGraphics = scene.add.graphics().setDepth(6);
     this.labelLayer = scene.add.container(0, 0).setDepth(8);
+    this.detailLabelLayer = scene.add.container(0, 0).setDepth(9);
   }
 
   objects(): Phaser.GameObjects.GameObject[] {
@@ -58,7 +76,13 @@ export class SlimeOverlay {
       this.particleGraphics,
       this.effectGraphics,
       this.labelLayer,
+      this.detailLabelLayer,
     ];
+  }
+
+  setStressDetail(enabled: boolean): void {
+    this.stressDetail = enabled;
+    this.detailLabelLayer.setVisible(enabled);
   }
 
   draw(slimes: ArmySlime[], time: number): void {
@@ -66,6 +90,7 @@ export class SlimeOverlay {
     this.bodyGraphics.clear();
     this.particleGraphics.clear();
     this.effectGraphics.clear();
+    this.causeLabel?.setVisible(false);
     for (const slime of slimes) this.drawSlime(slime, time);
     this.updateLabels(slimes);
   }
@@ -93,6 +118,7 @@ export class SlimeOverlay {
       slime.isSelected ? 0.98 : 0.75,
     );
     drawPolygon(this.bodyGraphics, points);
+    this.drawStressNetwork(slime, time);
 
     const coreRadius = 24 + slime.currentDensity * 8;
     this.bodyGraphics.fillStyle(color.fill, 0.22);
@@ -108,6 +134,202 @@ export class SlimeOverlay {
     this.drawFacing(slime, color.edge);
     this.drawWarnings(slime, boundary, time);
     this.drawContacts(slime, color.edge);
+  }
+
+  private stressColor(loadRatio: number): number {
+    if (loadRatio >= 1) return 0xff405d;
+    if (loadRatio >= 0.7) return 0xff8c42;
+    if (loadRatio >= 0.4) return 0xffd166;
+    return 0x47d7c8;
+  }
+
+  private drawStressNetwork(slime: ArmySlime, time: number): void {
+    const infos = stressLinks(slime);
+    const visible = infos.filter(
+      (info) =>
+        info.nodeA &&
+        info.nodeB &&
+        !info.link.broken &&
+        (this.stressDetail || slime.isSelected || info.loadRatio >= 0.7),
+    );
+
+    for (const info of visible) {
+      const a = info.nodeA!.position;
+      const b = info.nodeB!.position;
+      const load = info.loadRatio;
+      const color = this.stressColor(load);
+      const pulse = load >= 1 ? 0.58 + Math.sin(time * 0.014) * 0.28 : 0.58;
+      const alpha = slime.isSelected || this.stressDetail ? pulse : pulse * 0.78;
+      const width = 1.2 + Math.min(5.8, load * 4.4);
+      const segmentCount = 8;
+      const damage = 1 - info.link.integrity;
+
+      for (let i = 0; i < segmentCount; i += 1) {
+        if (damage > 0.08 && i % Math.max(2, Math.round(5 - damage * 4)) === 1)
+          continue;
+        const start = lerp(a, b, i / segmentCount);
+        const end = lerp(a, b, (i + 0.78) / segmentCount);
+        this.effectGraphics.lineStyle(width, color, alpha);
+        this.effectGraphics.lineBetween(start.x, start.y, end.x, end.y);
+      }
+
+      if (load >= 0.7) {
+        const midpoint = lerp(a, b, 0.5);
+        this.effectGraphics.fillStyle(color, 0.08 + Math.min(0.18, load * 0.08));
+        this.effectGraphics.fillCircle(
+          midpoint.x,
+          midpoint.y,
+          14 + Math.min(18, load * 10),
+        );
+        this.drawPressureArrow(slime, midpoint, color, load);
+      }
+    }
+
+    for (const info of infos.filter((candidate) => candidate.link.broken)) {
+      if (!info.nodeA || !info.nodeB) continue;
+      const midpoint = lerp(info.nodeA.position, info.nodeB.position, 0.5);
+      const aEnd = lerp(info.nodeA.position, midpoint, 0.72);
+      const bEnd = lerp(info.nodeB.position, midpoint, 0.72);
+      this.effectGraphics.lineStyle(4, 0xff405d, 0.9);
+      this.effectGraphics.lineBetween(
+        info.nodeA.position.x,
+        info.nodeA.position.y,
+        aEnd.x,
+        aEnd.y,
+      );
+      this.effectGraphics.lineBetween(
+        info.nodeB.position.x,
+        info.nodeB.position.y,
+        bEnd.x,
+        bEnd.y,
+      );
+      this.effectGraphics.fillStyle(0x07131d, 0.95);
+      this.effectGraphics.fillCircle(midpoint.x, midpoint.y, 5);
+    }
+
+    const critical = infos[0];
+    if (
+      critical?.nodeA &&
+      critical.nodeB &&
+      critical.loadRatio >= 0.7 &&
+      slime.splitStress < 0.18
+    ) {
+      this.drawPredictedFracture(slime, critical, time);
+    }
+    if (this.stressDetail && slime.isSelected) {
+      this.drawDetailedStressLabels(slime, infos);
+    }
+  }
+
+  private drawPressureArrow(
+    slime: ArmySlime,
+    midpoint: Vector2Like,
+    color: number,
+    loadRatio: number,
+  ): void {
+    const patch = slime.contactPatches.reduce<
+      ArmySlime["contactPatches"][number] | undefined
+    >((nearest, candidate) => {
+      if (!nearest) return candidate;
+      const current = Math.hypot(
+        candidate.center.x - midpoint.x,
+        candidate.center.y - midpoint.y,
+      );
+      const best = Math.hypot(
+        nearest.center.x - midpoint.x,
+        nearest.center.y - midpoint.y,
+      );
+      return current < best ? candidate : nearest;
+    }, undefined);
+    if (!patch) return;
+    const inward = scale(normalize(patch.normal), -1);
+    const start = add(midpoint, scale(inward, -30));
+    const end = add(midpoint, scale(inward, -5));
+    const side = perpendicular(inward);
+    this.effectGraphics.lineStyle(2 + Math.min(4, loadRatio * 2), color, 0.86);
+    this.effectGraphics.lineBetween(start.x, start.y, end.x, end.y);
+    this.effectGraphics.fillStyle(color, 0.9);
+    this.effectGraphics.fillTriangle(
+      end.x,
+      end.y,
+      end.x - inward.x * 9 + side.x * 5,
+      end.y - inward.y * 9 + side.y * 5,
+      end.x - inward.x * 9 - side.x * 5,
+      end.y - inward.y * 9 - side.y * 5,
+    );
+  }
+
+  private drawPredictedFracture(
+    slime: ArmySlime,
+    critical: StressLinkInfo,
+    time: number,
+  ): void {
+    const center = lerp(critical.nodeA!.position, critical.nodeB!.position, 0.5);
+    const pressureDirection =
+      slime.contactPatches[0]?.normal ??
+      normalize(sub(center, slime.center));
+    const direction = perpendicular(pressureDirection);
+    const length = Math.min(slime.currentWidth, slime.currentDepth) * 0.62;
+    const pulse = 0.3 + Math.sin(time * 0.009) * 0.12;
+    const segments = 8;
+    this.effectGraphics.lineStyle(2, 0xffd166, pulse);
+    for (let i = 0; i < segments; i += 2) {
+      const a = add(center, scale(direction, (i / segments - 0.5) * length));
+      const b = add(
+        center,
+        scale(direction, ((i + 1) / segments - 0.5) * length),
+      );
+      this.effectGraphics.lineBetween(a.x, a.y, b.x, b.y);
+    }
+  }
+
+  private drawDetailedStressLabels(
+    slime: ArmySlime,
+    infos: StressLinkInfo[],
+  ): void {
+    const inverseZoom = 1 / Math.max(0.12, this.scene.cameras.main.zoom);
+    const display = infos
+      .filter((info) => info.nodeA && info.nodeB)
+      .slice(0, 3);
+    const cause = display[0];
+    if (display.length > 0 && cause) {
+      let label = this.causeLabel;
+      if (!label) {
+        label = this.scene.add
+          .text(0, 0, "", {
+            fontFamily: "Inter, Noto Sans JP, sans-serif",
+            fontSize: "11px",
+            fontStyle: "bold",
+            color: "#fff2c2",
+            backgroundColor: "#07131dee",
+            padding: { x: 6, y: 4 },
+          })
+          .setOrigin(0.5)
+          .setResolution(2);
+        this.labelLayer.add(label);
+        this.causeLabel = label;
+      }
+      const lines = display.map(
+        (info) =>
+          `${shortNodeName(info.link.nodeAId)}-${shortNodeName(info.link.nodeBId)}  負荷${Math.round(info.loadRatio * 100)}%  耐久${Math.round(info.link.integrity * 100)}%`,
+      );
+      const view = this.scene.cameras.main.worldView;
+      const panelX = clamp(
+        slime.center.x,
+        view.left + 82 * inverseZoom,
+        view.right - 82 * inverseZoom,
+      );
+      const panelY = clamp(
+        slime.center.y + slime.currentWidth * 0.58,
+        view.top + 65 * inverseZoom,
+        view.bottom - 55 * inverseZoom,
+      );
+      label
+        .setText(`応力詳細\n${lines.join("\n")}\n主因：${stressCause(slime, cause)}`)
+        .setPosition(panelX, panelY)
+        .setScale(inverseZoom)
+        .setVisible(true);
+    }
   }
 
   private updateLabels(slimes: ArmySlime[]): void {
@@ -152,10 +374,18 @@ export class SlimeOverlay {
               : "#ffd0da";
       label
         .setText(
-          `${slime.isRouting ? "敗走  " : ""}兵力 ${Math.round(slime.mass)}  士気 ${Math.round(slime.morale)}`,
+          `${slime.isRouting ? "敗走  " : ""}兵 ${Math.round(slime.mass)}  士気 ${Math.round(slime.morale)}`,
         )
         .setColor(moraleColor)
-        .setPosition(slime.center.x, top - 12 * inverseZoom)
+        .setOrigin(0.5, 1)
+        .setPosition(
+          clamp(
+            slime.center.x,
+            this.scene.cameras.main.worldView.left + 55 * inverseZoom,
+            this.scene.cameras.main.worldView.right - 55 * inverseZoom,
+          ),
+          top - 12 * inverseZoom,
+        )
         .setScale(inverseZoom);
     }
   }
@@ -197,32 +427,6 @@ export class SlimeOverlay {
     if (slime.crowding > 0.18) {
       this.effectGraphics.fillStyle(0xff9f43, 0.08 + slime.crowding * 0.12);
       this.effectGraphics.fillCircle(slime.center.x, slime.center.y, 58 + slime.crowding * 30);
-    }
-    const byId = new Map(slime.nodes.map((node) => [node.id, node]));
-    const seenLinks = new Set<string>();
-    for (const node of slime.nodes) {
-      for (const link of node.links) {
-        const key = [link.nodeAId, link.nodeBId].sort().join("|");
-        if (seenLinks.has(key)) continue;
-        seenLinks.add(key);
-        if (!link.broken && link.integrity > 0.78 && link.stress < 0.3) continue;
-        const a = byId.get(link.nodeAId);
-        const b = byId.get(link.nodeBId);
-        if (!a || !b) continue;
-        const danger = Math.max(
-          link.broken ? 1 : 1 - link.integrity,
-          link.stress / Math.max(0.1, slime.effectiveToughness),
-        );
-        this.effectGraphics.lineStyle(
-          2 + Math.min(5, danger * 3),
-          link.broken ? 0xff5d73 : 0xffd166,
-          0.28 + Math.min(0.68, danger * 0.42),
-        );
-        this.effectGraphics.beginPath();
-        this.effectGraphics.moveTo(a.position.x, a.position.y);
-        this.effectGraphics.lineTo(b.position.x, b.position.y);
-        this.effectGraphics.strokePath();
-      }
     }
     if (slime.splitStress > 0.18 || slime.brokenLinkRatio > 0) {
       const crackDirection = perpendicular(slime.fractureNormal);

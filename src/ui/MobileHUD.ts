@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import type { BattleState } from "../sim/types";
 import { postureLabel } from "../sim/slime";
 import { encirclementStage, ringIntegrity } from "../sim/encirclement";
+import { shortNodeName, stressCause, stressLinks } from "../sim/stressDiagnostics";
 
 type HudActions = {
   togglePause: () => void;
@@ -9,6 +10,8 @@ type HudActions = {
   zoomIn: () => void;
   zoomOut: () => void;
   fitAll: () => void;
+  toggleStress: () => void;
+  stressDetailEnabled: () => boolean;
   setUiCapture: (value: boolean) => void;
 };
 
@@ -26,6 +29,7 @@ export class MobileHUD {
   private readonly warningText: Phaser.GameObjects.Text;
   private readonly pauseButton: Button;
   private readonly speedButton: Button;
+  private readonly stressButton: Button;
   private readonly cameraButtons: Button[] = [];
   private readonly allObjects: Phaser.GameObjects.GameObject[] = [];
 
@@ -42,6 +46,7 @@ export class MobileHUD {
     this.warningText = this.text("#ffd166", "right").setOrigin(1, 0);
     this.pauseButton = this.button("Ⅱ", actions.togglePause);
     this.speedButton = this.button("×1", actions.cycleSpeed);
+    this.stressButton = this.button("応力", actions.toggleStress, 52);
     this.cameraButtons = [
       this.button("+", actions.zoomIn, 42),
       this.button("−", actions.zoomOut, 42),
@@ -80,6 +85,21 @@ export class MobileHUD {
         `亀裂 ${(player.splitStress * 100).toFixed(0)}%  包囲力 ${(player.envelopPower * 100).toFixed(0)}  突破力 ${(player.breakthroughPower * 100).toFixed(0)}`,
     );
     const warnings: string[] = [];
+    const linkStress = stressLinks(player);
+    const criticalLink = linkStress[0];
+    if (this.actions.stressDetailEnabled()) {
+      linkStress.slice(0, 3).forEach((info) => {
+        warnings.push(
+          `${shortNodeName(info.link.nodeAId)}-${shortNodeName(info.link.nodeBId)} 負荷${Math.round(info.loadRatio * 100)}% 耐久${Math.round(info.link.integrity * 100)}%`,
+        );
+      });
+      if (criticalLink) warnings.push(`主因：${stressCause(player, criticalLink)}`);
+    } else if (criticalLink && criticalLink.loadRatio >= 0.4) {
+      warnings.push(
+        `${shortNodeName(criticalLink.link.nodeAId)}-${shortNodeName(criticalLink.link.nodeBId)} 負荷${Math.round(criticalLink.loadRatio * 100)}%`,
+      );
+      warnings.push(`要因：${stressCause(player, criticalLink)}`);
+    }
     if (player.gapRisk > 0.45) warnings.push("戦線の隙間");
     if (player.crowding > 0.18) warnings.push("過密継続");
     if (player.isEncircling && ringIntegrity(player) < 0.46) warnings.push("包囲線が薄い");
@@ -89,9 +109,23 @@ export class MobileHUD {
     if (player.peakLocalStress > player.effectiveToughness)
       warnings.push("局所応力が靱性を超過");
     if (player.splitStress > 0.45) warnings.push("亀裂が連結しています");
-    this.warningText.setText(warnings.length ? `⚠ ${warnings.join("\n⚠ ")}` : "形状は安定");
+    this.warningText.setText(
+      warnings.length
+        ? this.actions.stressDetailEnabled()
+          ? `応力解析\n${warnings.join("\n")}`
+          : `⚠ ${warnings.join("\n⚠ ")}`
+        : "形状は安定",
+    );
     this.pauseButton.label.setText(this.state.paused ? "▶" : "Ⅱ");
     this.speedButton.label.setText(`×${this.state.speed}`);
+    this.stressButton.label.setText(
+      this.actions.stressDetailEnabled() ? "応力ON" : "応力",
+    );
+    this.stressButton.background.setStrokeStyle(
+      2,
+      this.actions.stressDetailEnabled() ? 0xffd166 : 0x7cecff,
+      0.82,
+    );
   }
 
   objects(): Phaser.GameObjects.GameObject[] {
@@ -173,6 +207,7 @@ export class MobileHUD {
       .setFontSize(width < 460 ? 10 : 12);
     const cameraY = height - bottomHeight - 28;
     this.cameraButtons.forEach((button, index) => this.positionButton(button, 28 + index * 48, cameraY));
+    this.positionButton(this.stressButton, 180, cameraY);
   }
 
   destroy(): void {

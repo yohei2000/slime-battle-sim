@@ -304,7 +304,27 @@ function enforceCohesionEnvelope(slime: ArmySlime): void {
   }
 }
 
-function integrateNodes(slime: ArmySlime, enemy: ArmySlime, forces: ForceMap, dt: number): void {
+function enforceWorldBoundary(
+  slime: ArmySlime,
+  bounds: { width: number; height: number },
+): void {
+  const margin = 38;
+  for (const node of slime.nodes) {
+    const x = clamp(node.position.x, margin, bounds.width - margin);
+    const y = clamp(node.position.y, margin, bounds.height - margin);
+    if (x !== node.position.x) node.velocity.x *= -0.12;
+    if (y !== node.position.y) node.velocity.y *= -0.12;
+    node.position = { x, y };
+  }
+}
+
+function integrateNodes(
+  slime: ArmySlime,
+  enemy: ArmySlime,
+  forces: ForceMap,
+  dt: number,
+  bounds: { width: number; height: number },
+): void {
   for (const node of slime.nodes) {
     const force = forces.get(node.id) ?? { x: 0, y: 0 };
     node.velocity = add(node.velocity, scale(force, dt * 60 / node.mass));
@@ -315,6 +335,7 @@ function integrateNodes(slime: ArmySlime, enemy: ArmySlime, forces: ForceMap, dt
   }
   enforceZocBoundary(slime, enemy);
   enforceCohesionEnvelope(slime);
+  enforceWorldBoundary(slime, bounds);
   const nextCenter = average(slime.nodes.map((node) => node.position));
   slime.velocity = scale(sub(nextCenter, slime.center), 1 / Math.max(dt, 0.001));
   slime.center = nextCenter;
@@ -412,7 +433,7 @@ export function updateSlime(
   applyDensityForces(slime, forces);
   applyZocForces(slime, enemy, forces);
   applyTerrainForces(slime, forces, bounds);
-  integrateNodes(slime, enemy, forces, dt);
+  integrateNodes(slime, enemy, forces, dt, bounds);
   updateParticles(slime, dt);
   updateDerivedStats(slime, dt);
 }

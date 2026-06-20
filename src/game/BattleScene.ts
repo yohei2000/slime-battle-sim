@@ -22,6 +22,8 @@ export class BattleScene extends Phaser.Scene {
   private touchController!: TouchInputController;
   private lastPlayerPosture = "neutral";
   private lastEnemyPosture = "neutral";
+  private stressDetail = false;
+  private lastStressBand = 0;
 
   constructor() {
     super("BattleScene");
@@ -55,6 +57,11 @@ export class BattleScene extends Phaser.Scene {
       zoomIn: () => this.cameraController.zoomBy(1.18),
       zoomOut: () => this.cameraController.zoomBy(0.84),
       fitAll: () => this.cameraController.fitAll(this.scale.width, this.scale.height),
+      toggleStress: () => {
+        this.stressDetail = !this.stressDetail;
+        this.slimeOverlay.setStressDetail(this.stressDetail);
+      },
+      stressDetailEnabled: () => this.stressDetail,
       setUiCapture: (value) => this.touchController.setUiCapture(value),
     });
     const tutorial = new TutorialOverlay(this, () => {
@@ -105,6 +112,20 @@ export class BattleScene extends Phaser.Scene {
       this.battleLog.push(`敵軍：${enemy.posture}`);
       this.lastEnemyPosture = enemy.posture;
     }
+    const stressRatio =
+      player.peakLocalStress / Math.max(0.08, player.effectiveToughness);
+    const stressBand =
+      player.splitStress > 0.45 ? 3 : stressRatio >= 1 ? 2 : stressRatio >= 0.7 ? 1 : 0;
+    if (stressBand > this.lastStressBand) {
+      this.battleLog.push(
+        stressBand === 3
+          ? "亀裂が連結：分裂危険"
+          : stressBand === 2
+            ? "局所応力が靱性を超過"
+            : "高負荷リンクを検出",
+      );
+    }
+    this.lastStressBand = stressBand;
   }
 
   private drawBattlefield(width: number, height: number): Phaser.GameObjects.Graphics {
