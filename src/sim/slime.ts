@@ -7,10 +7,21 @@ import type {
   SlimeParticle,
   Vector2Like,
 } from "./types";
-import { add, normalize, perpendicular, rotate, scale } from "./vector";
+import {
+  add,
+  distance,
+  normalize,
+  perpendicular,
+  rotate,
+  scale,
+} from "./vector";
 
-const RING_NODE_COUNT = 18;
 const PARTICLE_COUNT = 128;
+const MESH_LAYERS = [
+  { name: "outer", count: 20, radius: 1, angleOffset: 0, mass: 1 },
+  { name: "mid", count: 14, radius: 0.68, angleOffset: 0.5, mass: 1.15 },
+  { name: "inner", count: 8, radius: 0.36, angleOffset: 0, mass: 1.35 },
+] as const;
 
 export type ArmySlimeOptions = {
   width?: number;
@@ -28,6 +39,11 @@ function roleForAngle(angle: number): SlimeNodeRole {
   return side > 0 ? "left" : "right";
 }
 
+function angleDistance(a: number, b: number): number {
+  const delta = Math.abs(a - b) % (Math.PI * 2);
+  return Math.min(delta, Math.PI * 2 - delta);
+}
+
 export function createArmySlime(
   id: string,
   side: Side,
@@ -43,52 +59,76 @@ export function createArmySlime(
   const particleCount = options.particleCount ?? PARTICLE_COUNT;
   const nodes: SlimeNode[] = [];
   const links: SlimeLink[] = [];
+  const layerNodes: SlimeNode[][] = [];
+  const layerAngles: number[][] = [];
 
-  for (let i = 0; i < RING_NODE_COUNT; i += 1) {
-    const angle = (i / RING_NODE_COUNT) * Math.PI * 2;
+  const createNode = (
+    nodeId: string,
+    role: SlimeNodeRole,
+    shapeU: number,
+    shapeV: number,
+    nodeMass: number,
+  ): SlimeNode => {
     const offset = add(
-      scale(direction, Math.cos(angle) * depth * 0.5),
-      scale(lateral, Math.sin(angle) * width * 0.5),
+      scale(direction, shapeU * depth * 0.5),
+      scale(lateral, shapeV * width * 0.5),
     );
-    nodes.push({
-      id: `${id}-node-${i}`,
-      role: roleForAngle(angle),
-      position: add(center, offset),
+    const position = add(center, offset);
+    const node: SlimeNode = {
+      id: nodeId,
+      role,
+      position,
       velocity: { x: 0, y: 0 },
-      targetPosition: add(center, offset),
-      mass: 1,
+      targetPosition: { ...position },
+      shapeU,
+      shapeV,
+      mass: nodeMass,
       localDensity: 1,
       localPressure: 0,
       localMorale: 82,
       localCohesion: 82,
       links: [],
-    });
-  }
+    };
+    nodes.push(node);
+    return node;
+  };
 
-  nodes.push({
-    id: `${id}-core`,
-    role: "interior",
-    position: { ...center },
-    velocity: { x: 0, y: 0 },
-    targetPosition: { ...center },
-    mass: 2.5,
-    localDensity: 1,
-    localPressure: 0,
-    localMorale: 84,
-    localCohesion: 88,
-    links: [],
+  MESH_LAYERS.forEach((layer, layerIndex) => {
+    const ring: SlimeNode[] = [];
+    const angles: number[] = [];
+    for (let i = 0; i < layer.count; i += 1) {
+      const angle =
+        ((i + layer.angleOffset) / layer.count) * Math.PI * 2;
+      const shapeU = Math.cos(angle) * layer.radius;
+      const shapeV = Math.sin(angle) * layer.radius;
+      ring.push(
+        createNode(
+          `${id}-${layer.name}-${i}`,
+          layerIndex === 0 ? roleForAngle(angle) : "interior",
+          shapeU,
+          shapeV,
+          layer.mass,
+        ),
+      );
+      angles.push(angle);
+    }
+    layerNodes.push(ring);
+    layerAngles.push(angles);
   });
 
-  const core = nodes[nodes.length - 1];
+  const core = createNode(`${id}-core`, "interior", 0, 0, 2.5);
+  core.localMorale = 84;
+  core.localCohesion = 88;
+
+  const connected = new Set<string>();
   const connect = (a: SlimeNode, b: SlimeNode, stiffness: number): void => {
-    const restLength = Math.hypot(
-      a.position.x - b.position.x,
-      a.position.y - b.position.y,
-    );
+    const key = [a.id, b.id].sort().join("|");
+    if (connected.has(key)) return;
+    connected.add(key);
     const link: SlimeLink = {
       nodeAId: a.id,
       nodeBId: b.id,
-      restLength,
+      restLength: distance(a.position, b.position),
       stiffness,
       damping: 0.72,
       integrity: 1,
@@ -101,29 +141,61 @@ export function createArmySlime(
     b.links.push(link);
   };
 
-  for (let i = 0; i < RING_NODE_COUNT; i += 1) {
-    connect(nodes[i], nodes[(i + 1) % RING_NODE_COUNT], 0.84);
-    connect(nodes[i], core, 0.32);
-    if (i % 3 === 0) connect(nodes[i], nodes[(i + 3) % RING_NODE_COUNT], 0.22);
+  layerNodes.forEach((ring, layerIndex) => {
+    const stiffness = layerIndex === 0 ? 0.82 : layerIndex === 1 ? 0.66 : 0.54;
+    for (let i = 0; i < ring.length; i += 1) {
+      connect(ring[i], ring[(i + 1) % ring.length], stiffness);
+    }
+  });
+
+  for (let layerIndex = 0; layerIndex < layerNodes.length - 1; layerIndex += 1) {
+    const outer = layerNodes[layerIndex];
+    const inner = layerNodes[layerIndex + 1];
+    const outerAngles = layerAngles[layerIndex];
+    const innerAngles = layerAngles[layerIndex + 1];
+    outer.forEach((node, index) => {
+      const nearest = innerAngles
+        .map((angle, innerIndex) => ({
+          innerIndex,
+          distance: angleDistance(outerAngles[index], angle),
+        }))
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 2);
+      nearest.forEach(({ innerIndex }) =>
+        connect(node, inner[innerIndex], layerIndex === 0 ? 0.58 : 0.48),
+      );
+    });
   }
 
-  const particles: SlimeParticle[] = Array.from({ length: particleCount }, (_, i) => {
-    const angle = (i * 2.399963229728653) % (Math.PI * 2);
-    const radius = Math.sqrt((i + 0.5) / particleCount) * 0.88;
-    const local = add(
-      scale(direction, Math.cos(angle) * depth * 0.5 * radius),
-      scale(lateral, Math.sin(angle) * width * 0.5 * radius),
-    );
-    const nodeIndex = Math.round((angle / (Math.PI * 2)) * RING_NODE_COUNT) % RING_NODE_COUNT;
-    return {
-      id: `${id}-particle-${i}`,
-      position: add(center, local),
-      velocity: { x: 0, y: 0 },
-      localNodeId: nodes[nodeIndex].id,
-      alive: true,
-      phase: Math.random() * Math.PI * 2,
-    };
-  });
+  layerNodes[2].forEach((node) => connect(node, core, 0.38));
+
+  const particleAnchors = nodes.filter((node) => node !== core);
+  const particles: SlimeParticle[] = Array.from(
+    { length: particleCount },
+    (_, i) => {
+      const angle = (i * 2.399963229728653) % (Math.PI * 2);
+      const radius = Math.sqrt((i + 0.5) / particleCount) * 0.88;
+      const local = add(
+        scale(direction, Math.cos(angle) * depth * 0.5 * radius),
+        scale(lateral, Math.sin(angle) * width * 0.5 * radius),
+      );
+      const position = add(center, local);
+      const anchor = particleAnchors.reduce((nearest, candidate) =>
+        distance(candidate.position, position) <
+        distance(nearest.position, position)
+          ? candidate
+          : nearest,
+      );
+      return {
+        id: `${id}-particle-${i}`,
+        position,
+        velocity: { x: 0, y: 0 },
+        localNodeId: anchor.id,
+        alive: true,
+        phase: Math.random() * Math.PI * 2,
+      };
+    },
+  );
 
   return {
     id,
@@ -191,7 +263,11 @@ export function getBoundaryNodes(slime: ArmySlime): SlimeNode[] {
   return slime.nodes.filter((node) => node.role !== "interior");
 }
 
-export function pointInsideSlime(slime: ArmySlime, point: Vector2Like, padding = 0): boolean {
+export function pointInsideSlime(
+  slime: ArmySlime,
+  point: Vector2Like,
+  padding = 0,
+): boolean {
   const direction = normalize(slime.facing);
   const lateral = perpendicular(direction);
   const delta = { x: point.x - slime.center.x, y: point.y - slime.center.y };
@@ -199,7 +275,11 @@ export function pointInsideSlime(slime: ArmySlime, point: Vector2Like, padding =
   const sideways = delta.x * lateral.x + delta.y * lateral.y;
   const rx = slime.currentDepth * 0.55 + padding;
   const ry = slime.currentWidth * 0.55 + padding;
-  return (forward * forward) / (rx * rx) + (sideways * sideways) / (ry * ry) <= 1;
+  return (
+    (forward * forward) / (rx * rx) +
+      (sideways * sideways) / (ry * ry) <=
+    1
+  );
 }
 
 export function postureLabel(posture: ArmySlime["posture"]): string {
@@ -214,10 +294,19 @@ export function postureLabel(posture: ArmySlime["posture"]): string {
   }[posture];
 }
 
-export function setDesiredFacing(slime: ArmySlime, facing: Vector2Like): void {
+export function setDesiredFacing(
+  slime: ArmySlime,
+  facing: Vector2Like,
+): void {
   slime.desiredDirection = normalize(facing);
 }
 
-export function jitterFacing(slime: ArmySlime, amount: number): Vector2Like {
-  return rotate(slime.facing, Math.sin(slime.tension * 13 + slime.center.x) * amount);
+export function jitterFacing(
+  slime: ArmySlime,
+  amount: number,
+): Vector2Like {
+  return rotate(
+    slime.facing,
+    Math.sin(slime.tension * 13 + slime.center.x) * amount,
+  );
 }

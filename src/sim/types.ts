@@ -34,6 +34,8 @@ export type SlimeNode = {
   position: Vector2Like;
   velocity: Vector2Like;
   targetPosition: Vector2Like;
+  shapeU: number;
+  shapeV: number;
   mass: number;
   localDensity: number;
   localPressure: number;

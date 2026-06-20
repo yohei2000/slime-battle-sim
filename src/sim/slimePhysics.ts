@@ -25,34 +25,30 @@ function addForce(forces: ForceMap, node: SlimeNode, force: Vector2Like): void {
 function updateDesiredShape(slime: ArmySlime): void {
   const direction = normalize(slime.desiredDirection);
   const lateral = perpendicular(direction);
-  const boundary = slime.nodes.filter((node) => node.role !== "interior");
   const wingCurve = slime.posture === "envelop" ? 0.34 : 0;
 
-  boundary.forEach((node, i) => {
-    const angle = (i / boundary.length) * Math.PI * 2;
-    let forward = Math.cos(angle) * slime.desiredDepth * 0.5;
-    const sideways = Math.sin(angle) * slime.desiredWidth * 0.5;
-    const leftWeight = clamp01(Math.sin(angle));
-    const rightWeight = clamp01(-Math.sin(angle));
-    const wingFrontBias = 0.35 + Math.max(0, Math.cos(angle)) * 0.65;
+  slime.nodes.forEach((node) => {
+    let forward = node.shapeU * slime.desiredDepth * 0.5;
+    const sideways = node.shapeV * slime.desiredWidth * 0.5;
+    const leftWeight = clamp01(node.shapeV);
+    const rightWeight = clamp01(-node.shapeV);
+    const wingFrontBias = 0.35 + Math.max(0, node.shapeU) * 0.65;
     forward +=
       (slime.desiredLeftWingAdvance * leftWeight +
         slime.desiredRightWingAdvance * rightWeight) *
       wingFrontBias;
     if (slime.posture === "envelop") {
-      forward += Math.abs(Math.sin(angle)) * slime.desiredDepth * wingCurve;
+      forward += Math.abs(node.shapeV) * slime.desiredDepth * wingCurve;
     }
-    if (slime.posture === "breakthrough" && Math.cos(angle) > 0.45) {
-      forward += slime.desiredDepth * 0.2;
+    if (slime.posture === "breakthrough" && node.shapeU > 0.45) {
+      forward +=
+        slime.desiredDepth * 0.2 * clamp01((node.shapeU - 0.45) / 0.55);
     }
     node.targetPosition = add(
       slime.desiredCenter,
       add(scale(direction, forward), scale(lateral, sideways)),
     );
   });
-
-  const core = slime.nodes.find((node) => node.role === "interior");
-  if (core) core.targetPosition = { ...slime.desiredCenter };
 }
 
 function applyOrderForces(slime: ArmySlime, forces: ForceMap): void {
@@ -165,11 +161,11 @@ function applySpringForces(
         continue;
       }
       totalIntegrity += link.integrity;
-      const targetScale =
-        slime.currentWidth > 0 && (a.role === "left" || a.role === "right" || b.role === "left" || b.role === "right")
-          ? slime.desiredWidth / slime.baseWidth
-          : slime.desiredDepth / slime.baseDepth;
-      const targetLength = link.restLength * clamp(targetScale, 0.62, 1.62);
+      const targetLength = clamp(
+        distance(a.targetPosition, b.targetPosition),
+        link.restLength * 0.58,
+        link.restLength * 1.72,
+      );
       const stretch = currentLength - targetLength;
       const direction = scale(delta, 1 / currentLength);
       const relativeVelocity = dot(sub(b.velocity, a.velocity), direction);

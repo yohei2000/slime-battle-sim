@@ -96,12 +96,15 @@
 
 ```text
 ArmySlime
-├─ 18 × 輪郭SlimeNode
+├─ 20 × 外周SlimeNode
+├─ 14 × 中間層SlimeNode
+├─ 8 × 内層SlimeNode
 ├─ 1 × 中心SlimeNode
 ├─ SlimeLink
-│  ├─ 輪郭の隣接リンク
-│  ├─ 輪郭から中心へのリンク
-│  └─ 3ノード間隔の補強リンク
+│  ├─ 同一層の隣接リンク
+│  ├─ 外周–中間層の局所近傍リンク
+│  ├─ 中間層–内層の局所近傍リンク
+│  └─ 内層–中心の短距離リンク
 ├─ 128 × SlimeParticle
 ├─ ContactPatch[]
 └─ SlimeOrder?
@@ -121,30 +124,37 @@ ArmySlime
 | `left` | 左翼。左翼前進の対象 |
 | `right` | 右翼。右翼前進の対象 |
 | `rear` | 後方 |
-| `interior` | 中心。スライム全体の核 |
+| `interior` | 中間層、内層、中心。内部メッシュを構成 |
 
 輪郭ノードの役割は初期角度から決定され、シミュレーション中に動的変更されない。
+
+各ノードは初期形状内の正規化座標 `shapeU` / `shapeV` を持つ。外周は半径1.0、中間層は0.68、内層は0.36、中心は0である。形状変更時は全層ノードの目標位置をこの座標から再計算する。
 
 ### 4.3 SlimeLink
 
 ノード間のばねであり、形状維持と変形遅延を担当する。
 
-各リンクは `integrity` と `broken` を持つ。通常範囲では耐久度が回復するが、構造伸長率が限界を超えると耐久度を失い、0になると回復不能で切断される。
+各リンクは `integrity`、`stress`、`localPressure`、`broken` を持つ。外周から中心までを一本で結ぶ長距離リンクは存在しない。これにより、前面へ加わった敵圧は近傍メッシュへ限定して伝わり、反対側へ同じ応力が即時発生しない。
 
 初期リンク:
 
 | リンク | stiffness | damping | integrity | broken |
 |---|---:|---:|---:|---|
-| 輪郭の隣接ノード | 0.84 | 0.72 | 1.0 | false |
-| 輪郭–中心 | 0.32 | 0.72 | 1.0 | false |
-| 3ノード間隔の補強 | 0.22 | 0.72 | 1.0 | false |
+| 外周の隣接ノード | 0.82 | 0.72 | 1.0 | false |
+| 中間層の隣接ノード | 0.66 | 0.72 | 1.0 | false |
+| 内層の隣接ノード | 0.54 | 0.72 | 1.0 | false |
+| 外周–中間層の近傍2点 | 0.58 | 0.72 | 1.0 | false |
+| 中間層–内層の近傍2点 | 0.48 | 0.72 | 1.0 | false |
+| 内層–中心 | 0.38 | 0.72 | 1.0 | false |
+
+初期構造は43ノード、118リンクで構成する。層間リンクは角度が近い2点だけへ接続し、網目状の三角形・四角形セルを形成する。
 
 ### 4.4 SlimeParticle
 
 128個の表示用兵士粒子である。
 
 - ゲーム判断の主体ではない。
-- 最寄りの輪郭ノードと中心の中間へ追従する。
+- 全メッシュノードから最寄りのノードをアンカーとして追従する。
 - 正弦波による局所的な徘徊を加える。
 - 個別選択、個別命令、個別戦闘は行わない。
 
@@ -159,7 +169,7 @@ ArmySlime
 | `desiredDensity` | 1.0 | 入力・保留 | 命令値として保持するが、現行の物理密度は面積から再計算 |
 | `desiredLeftWingAdvance` | 0 | 入力 | 左翼の追加前進量 |
 | `desiredRightWingAdvance` | 0 | 入力 | 右翼の追加前進量 |
-| `baseWidth` | 250 | 基準値 | 密度・張力・分裂限界の基準幅 |
+| `baseWidth` | 250 | 基準値 | 密度・張力の基準幅 |
 | `baseDepth` | 180 | 基準値 | 密度とばね目標の基準奥行き |
 | `currentWidth` | 250 | 派生 | 現在の輪郭幅 |
 | `currentDepth` | 180 | 派生 | 現在の輪郭奥行き |
@@ -589,11 +599,14 @@ shapeForce =
 
 ### 12.3 ばね力
 
-目標リンク長は、幅または奥行きの目標比率を初期リンク長へ掛ける。
+目標リンク長は、両端ノードの `shapeU` / `shapeV` から算出した目標位置間距離を使う。これにより外周だけでなく内部メッシュも展開・密集・翼前進へ追従する。
 
 ```text
-targetScale = clamp(desiredSize / baseSize, 0.62, 1.62)
-targetLength = restLength × targetScale
+targetLength = clamp(
+  distance(nodeA.targetPosition, nodeB.targetPosition),
+  restLength × 0.58,
+  restLength × 1.72
+)
 stretch = currentLength - targetLength
 cohesionStrength = 0.25 + cohesion / 125
 

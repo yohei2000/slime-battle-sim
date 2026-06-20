@@ -29,8 +29,10 @@ export function stressLinks(slime: ArmySlime): StressLinkInfo[] {
 
 export function shortNodeName(nodeId: string): string {
   if (nodeId.endsWith("-core")) return "C";
-  const match = nodeId.match(/-node-(\d+)$/);
-  return match ? `N${match[1]}` : nodeId;
+  const match = nodeId.match(/-(outer|mid|inner)-(\d+)$/);
+  if (!match) return nodeId;
+  const prefix = match[1] === "outer" ? "O" : match[1] === "mid" ? "M" : "I";
+  return `${prefix}${match[2]}`;
 }
 
 export function stressCause(slime: ArmySlime, info?: StressLinkInfo): string {
