@@ -132,23 +132,55 @@ export class SlimeOverlay {
       this.effectGraphics.fillStyle(0xff9f43, 0.08 + slime.crowding * 0.12);
       this.effectGraphics.fillCircle(slime.center.x, slime.center.y, 58 + slime.crowding * 30);
     }
+    const byId = new Map(slime.nodes.map((node) => [node.id, node]));
+    const seenLinks = new Set<string>();
+    for (const node of slime.nodes) {
+      for (const link of node.links) {
+        const key = [link.nodeAId, link.nodeBId].sort().join("|");
+        if (seenLinks.has(key)) continue;
+        seenLinks.add(key);
+        if (!link.broken && link.integrity > 0.78 && link.stress < 0.3) continue;
+        const a = byId.get(link.nodeAId);
+        const b = byId.get(link.nodeBId);
+        if (!a || !b) continue;
+        const danger = Math.max(
+          link.broken ? 1 : 1 - link.integrity,
+          link.stress / Math.max(0.1, slime.effectiveToughness),
+        );
+        this.effectGraphics.lineStyle(
+          2 + Math.min(5, danger * 3),
+          link.broken ? 0xff5d73 : 0xffd166,
+          0.28 + Math.min(0.68, danger * 0.42),
+        );
+        this.effectGraphics.beginPath();
+        this.effectGraphics.moveTo(a.position.x, a.position.y);
+        this.effectGraphics.lineTo(b.position.x, b.position.y);
+        this.effectGraphics.strokePath();
+      }
+    }
     if (slime.splitStress > 0.18 || slime.brokenLinkRatio > 0) {
-      const tangent = perpendicular(slime.facing);
-      const crackLength = slime.currentDepth * 0.42;
+      const crackDirection = perpendicular(slime.fractureNormal);
+      const wobbleDirection = slime.fractureNormal;
+      const crackLength =
+        Math.min(slime.currentWidth, slime.currentDepth) *
+        (0.18 + slime.fractureConcentration * 0.42);
       const segments = 7;
       this.effectGraphics.lineStyle(
         3 + slime.splitStress * 5,
-        0xffd166,
+        slime.fractureLinkCount >= 2 ? 0xff5d73 : 0xffd166,
         0.45 + slime.splitStress * 0.5,
       );
       this.effectGraphics.beginPath();
       for (let i = 0; i <= segments; i += 1) {
         const t = i / segments - 0.5;
         const point = add(
-          slime.center,
+          slime.fractureCenter,
           add(
-            scale(slime.facing, t * crackLength * 2),
-            scale(tangent, Math.sin(i * 2.3) * (4 + slime.splitStress * 12)),
+            scale(crackDirection, t * crackLength * 2),
+            scale(
+              wobbleDirection,
+              Math.sin(i * 2.3) * (3 + slime.splitStress * 10),
+            ),
           ),
         );
         if (i === 0) this.effectGraphics.moveTo(point.x, point.y);

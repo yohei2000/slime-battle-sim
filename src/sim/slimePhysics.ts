@@ -65,12 +65,52 @@ function applyOrderForces(slime: ArmySlime, forces: ForceMap): void {
   }
 }
 
-function applySpringForces(slime: ArmySlime, forces: ForceMap, dt: number): void {
+function localEnemyPressure(
+  slime: ArmySlime,
+  enemy: ArmySlime,
+  node: SlimeNode,
+): number {
+  const patch = slime.contactPatches.find((candidate) =>
+    candidate.ownNodeIds.includes(node.id),
+  );
+  const contactLoad = patch
+    ? clamp01(patch.pressure / 48) * (0.72 + enemy.zocStrength * 0.28)
+    : 0;
+  const sample = sampleEnemyZoc(enemy, node.position);
+  const pressureRange = sample.clearance + 14;
+  const zocCompression = sample.insideBody
+    ? 1
+    : clamp01((pressureRange - sample.distance) / pressureRange);
+  return clamp(
+    (contactLoad * 0.72 + zocCompression * 0.38) *
+      (0.7 + enemy.currentDensity * 0.3),
+    0,
+    1.25,
+  );
+}
+
+function applySpringForces(
+  slime: ArmySlime,
+  enemy: ArmySlime,
+  forces: ForceMap,
+  dt: number,
+): void {
   const byId = new Map(slime.nodes.map((node) => [node.id, node]));
+  const pressureByNode = new Map(
+    slime.nodes.map((node) => [node.id, localEnemyPressure(slime, enemy, node)]),
+  );
   const seen = new Set<string>();
   let totalIntegrity = 0;
   let linkCount = 0;
   let brokenCount = 0;
+  let peakLocalStress = 0;
+  slime.effectiveToughness = clamp(
+    slime.toughness *
+      (0.55 + slime.cohesion * 0.0045) *
+      (0.72 + slime.morale * 0.0028),
+    0.18,
+    1.2,
+  );
   for (const node of slime.nodes) {
     for (const link of node.links) {
       const key = [link.nodeAId, link.nodeBId].sort().join("|");
@@ -87,14 +127,36 @@ function applySpringForces(slime: ArmySlime, forces: ForceMap, dt: number): void
       const delta = sub(b.position, a.position);
       const currentLength = Math.max(0.001, length(delta));
       const structuralStrain = currentLength / Math.max(0.001, link.restLength);
-      if (structuralStrain > 1.52) {
+      const endpointPressure =
+        Math.max(
+          pressureByNode.get(a.id) ?? 0,
+          pressureByNode.get(b.id) ?? 0,
+        ) *
+          0.7 +
+        ((pressureByNode.get(a.id) ?? 0) +
+          (pressureByNode.get(b.id) ?? 0)) *
+          0.15;
+      link.localPressure = endpointPressure;
+      const strainAmplifier =
+        0.78 + Math.max(0, structuralStrain - 0.92) * 0.92;
+      const fatigueAmplifier = 0.82 + slime.fatigue / 145;
+      const stressTarget = endpointPressure * strainAmplifier * fatigueAmplifier;
+      link.stress +=
+        (stressTarget - link.stress) * clamp01(dt * (stressTarget > link.stress ? 5 : 2.4));
+      link.stress = clamp(link.stress, 0, 1.5);
+      peakLocalStress = Math.max(peakLocalStress, link.stress);
+
+      if (link.stress > slime.effectiveToughness) {
         link.integrity -=
-          (structuralStrain - 1.52) *
-          0.9 *
-          (1 + (100 - slime.cohesion) / 80) *
+          (link.stress - slime.effectiveToughness) *
+          1 *
+          (1 + (100 - slime.cohesion) / 120) *
           dt;
-      } else if (structuralStrain < 1.3) {
-        link.integrity = Math.min(1, link.integrity + 0.12 * dt);
+      } else if (
+        link.stress < slime.effectiveToughness * 0.58 &&
+        link.localPressure < 0.16
+      ) {
+        link.integrity = Math.min(1, link.integrity + 0.025 * dt);
       }
       if (link.integrity <= 0) {
         link.integrity = 0;
@@ -122,6 +184,7 @@ function applySpringForces(slime: ArmySlime, forces: ForceMap, dt: number): void
   slime.brokenLinkRatio = linkCount > 0 ? brokenCount / linkCount : 0;
   slime.linkIntegrity =
     linkCount > 0 ? totalIntegrity / Math.max(1, linkCount - brokenCount) : 1;
+  slime.peakLocalStress = peakLocalStress;
 }
 
 function applyDensityForces(slime: ArmySlime, forces: ForceMap): void {
@@ -345,7 +408,7 @@ export function updateSlime(
   updateDesiredShape(slime);
   const forces: ForceMap = new Map();
   applyOrderForces(slime, forces);
-  applySpringForces(slime, forces, dt);
+  applySpringForces(slime, enemy, forces, dt);
   applyDensityForces(slime, forces);
   applyZocForces(slime, enemy, forces);
   applyTerrainForces(slime, forces, bounds);

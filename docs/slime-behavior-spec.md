@@ -185,6 +185,10 @@ ArmySlime
 | `shockTimer` | 0 | 0 | 状態 |
 | `linkIntegrity` | 1 | 1 | 派生 |
 | `brokenLinkRatio` | 0 | 0 | 派生 |
+| `toughness` | 0.68 | 0.68 | 基礎 |
+| `effectiveToughness` | 0.68 | 0.68 | 派生 |
+| `peakLocalStress` | 0 | 0 | 派生 |
+| `fractureConcentration` | 0 | 0 | 派生 |
 | `splitStress` | 0 | 0 | 状態 |
 | `splitGeneration` | 0 | 0 | 状態 |
 | `splitCooldown` | 0 | 0 | 状態 |
@@ -254,7 +258,11 @@ ArmySlime
 | `shockTimer` | 状態 | 突破直後の戦闘力補正 |
 | `linkIntegrity` | 派生 | 未切断リンクの平均耐久度 |
 | `brokenLinkRatio` | 派生 | 全リンクに占める切断済みリンクの割合 |
-| `splitStress` | 状態 | 幅超過・張力・リンク損傷による分裂進行度 |
+| `toughness` | 基礎 | 材料としての靱性。局所応力に耐える基準値 |
+| `effectiveToughness` | 派生 | cohesionとmoraleを加味した現在の実効靱性 |
+| `peakLocalStress` | 派生 | 全リンク中で最大の局所応力 |
+| `fractureConcentration` | 派生 | 近接する損傷リンク群の集中度 |
+| `splitStress` | 状態 | 局所亀裂が分裂面へ連結する進行度 |
 | `splitGeneration` | 状態 | 何回目の分裂で生成されたか |
 | `splitCooldown` | 状態 | 分裂直後の再分裂禁止時間 |
 
@@ -594,26 +602,48 @@ magnitude =
 
 #### 12.3.1 リンク耐久度
 
-```text
-structuralStrain =
-  currentLength / restLength
-```
-
-伸長率が1.52を超える場合:
+リンクは幅や伸長率だけでは損傷しない。敵との接触面および敵ZOCから受ける局所圧力を、リンク両端のノードから取得する。
 
 ```text
-integrity -=
-  (structuralStrain - 1.52)
-  × 0.9
-  × (1 + (100 - cohesion) / 80)
-  × dt
+endpointPressure =
+  max(nodeAEnemyPressure, nodeBEnemyPressure) × 0.70
+  + average(nodeAEnemyPressure, nodeBEnemyPressure) × 0.30
+
+strainAmplifier =
+  0.78 + max(0, structuralStrain - 0.92) × 0.92
+
+fatigueAmplifier =
+  0.82 + fatigue / 145
+
+stressTarget =
+  endpointPressure
+  × strainAmplifier
+  × fatigueAmplifier
 ```
 
-伸長率が1.3未満の場合:
+伸びは敵圧による応力を増幅するが、`endpointPressure = 0` なら `stressTarget = 0` であり、展開幅だけを原因とする破断は発生しない。
+
+実効靱性:
 
 ```text
-integrity = min(1, integrity + 0.12 × dt)
+effectiveToughness =
+  toughness
+  × (0.55 + cohesion × 0.0045)
+  × (0.72 + morale × 0.0028)
 ```
+
+局所応力が実効靱性を超えた時間だけ耐久度を失う。
+
+```text
+if stress > effectiveToughness:
+  integrity -=
+    (stress - effectiveToughness)
+    × 1.00
+    × (1 + (100 - cohesion) / 120)
+    × dt
+```
+
+圧力がほぼ消え、応力が靱性の58%未満まで抜けた未切断リンクは、毎秒0.025だけ緩やかに回復する。
 
 ```text
 if integrity <= 0:
@@ -1099,13 +1129,13 @@ AI目標形状:
 
 現行AIは戦線回転・片翼前進を使用しない。
 
-## 20. リンク切断と分裂
+## 20. 局所応力、リンク切断、分裂
 
 ### 20.1 分裂の目的
 
-展開には「幅を広げ続けてもばねで無限に維持できる」という状態を作らない。
+分裂は「広げすぎたから自動的に割れる」現象ではない。敵から押された場所へ局所的に応力が集中し、現在の靱性を超え続けた結果として起きる。
 
-通常範囲ではリンクばねが一体性を維持する。限界幅を超えて展開を維持するとリンク耐久度が下がり、接続が切れ、最終的にArmySlimeが左右2個へ分裂する。
+展開した軍勢は密度・cohesionが下がりやすいため、同じ敵圧でも実効靱性が不足しやすい。ただし、敵圧がなければどれだけ幅を広げてもリンク損傷は発生しない。
 
 ### 20.2 分裂可能条件
 
@@ -1117,111 +1147,82 @@ splitCooldown <= 0
 
 最大2世代まで分裂できる。質量が42未満の小スライムはそれ以上分裂しない。
 
-### 20.3 分裂開始幅
+### 20.3 局所損傷の集約
 
 ```text
-splitWidth = baseWidth × 1.45
+damagedLink =
+  broken
+  or integrity < 0.82
 
-overWidth = clamp01(
-  (currentWidth - splitWidth)
-  / (baseWidth × 0.35)
-)
+clusterRadius =
+  max(54, min(currentWidth, currentDepth) × 0.42)
 ```
 
-初期幅250のスライムでは、幅362.5を超えると分裂ストレスが蓄積し始める。
+各損傷リンクの中点を求め、半径内にある損傷リンクを亀裂クラスターとして集約する。全体に散った軽微な損傷では分裂せず、近い位置で複数リンクが切れることが必要になる。
 
-### 20.4 構造損傷
+### 20.4 亀裂集中度
 
 ```text
-structuralDamage =
-  0.25
-  + tension × 0.55
-  + brokenLinkRatio × 1.8
-  + (1 - linkIntegrity) × 0.65
+severity =
+  broken ? 1 : 1 - integrity
 
-cohesionVulnerability =
-  0.5 + (100 - cohesion) / 100
+fractureConcentration =
+  clamp01(strongestClusterSeverity / 2.7)
 ```
 
-幅超過中:
+亀裂中心は最強クラスターの損傷度による加重平均位置とする。亀裂法線はスライム中心から亀裂中心へ向く方向であり、分裂後の離隔方向にも使う。
 
 ```text
-splitStress +=
-  overWidth
-  × structuralDamage
-  × cohesionVulnerability
-  × 0.68
-  × dt
+targetProgress =
+  fractureConcentration × 0.82
+  + clamp01(localBrokenLinks / 2) × 0.28
 ```
 
-安全幅へ戻った場合:
-
-```text
-splitStress -= 0.14 × dt
-```
-
-分裂不能・クールダウン中:
-
-```text
-splitStress -= 0.18 × dt
-```
-
-`splitStress` は0–1に制限する。
+`splitStress` は `targetProgress` へ追従する。損傷リンクが存在しない場合は毎秒0.22ずつ低下する。
 
 ### 20.5 分裂成立条件
 
 ```text
 splitStress >= 0.72
-brokenLinkRatio >= 0.08
+fractureConcentration >= 0.68
+同一局所クラスター内の切断リンク数 >= 2
 ```
 
-幅が広いだけでは即分裂しない。実際に8%以上のリンクが切れ、分裂ストレスが72%以上になる必要がある。
+全体の切断率ではなく、近接した切断リンクが分裂面を形成したかで判定する。
 
 ### 20.6 分裂後の生成
 
 ```text
-childMass = parentMass × 0.5
-
-childWidth = clamp(
-  parent.currentWidth × 0.44,
-  max(105, parent.baseWidth × 0.54),
-  240
-)
-
-childDepth = clamp(
-  parent.currentDepth × 0.92,
-  100,
-  250
-)
-
-separation =
-  childWidth × 0.48 + 20
+fractureFragmentMass = parentMass × 0.42
+mainBodyMass = parentMass × 0.58
+separationAxis = fractureNormal
 ```
 
-子スライムは親の `facing` に対する左右方向へ配置する。
+子スライムは固定の左右方向ではなく、亀裂の局所位置から求めた `fractureNormal` に沿って配置する。前面が破断すれば前後へ、側面が破断すれば左右へ分かれる。
 
 状態継承:
 
 ```text
-morale = parent.morale - 6
-cohesion = parent.cohesion - 18
-fatigue = parent.fatigue + 10
+morale = parent.morale - 7
+cohesion = parent.cohesion - 20
+fatigue = parent.fatigue + 11
 pressure = parent.pressure + 12
 encirclement = parent.encirclement × 0.65
+toughness = parent.toughness - 0.04
 splitCooldown = 3.5秒
 ```
 
 - 総質量は分裂前後で保存する。
-- 生存粒子数を半分ずつ割り当てる。各子の最低粒子数は32。
-- 親が選択中なら左側の子が選択を引き継ぐ。
-- 右側の子は非選択で生成する。
+- 生存粒子数は質量比42:58で割り当てる。
+- 親が選択中なら、質量58%の主塊が選択を引き継ぐ。
 - 分裂後は両方とも独立したArmySlimeとして移動・戦闘・再選択できる。
 
 ### 20.7 表示
 
-- HUDに接続耐久度と分裂ストレスを表示する。
-- `splitStress > 0.45` で「接続が切れかけています」と警告する。
-- `splitStress > 0.18` またはリンク切断発生後、中心付近へ亀裂線を描画する。
+- HUDに接続耐久度、最大局所応力、実効靱性、亀裂進行度を表示する。
+- `peakLocalStress > effectiveToughness` で「局所応力が靱性を超過」と警告する。
+- `splitStress > 0.45` で「亀裂が連結しています」と警告する。
+- 損傷リンクを黄、切断リンクを赤で描画し、亀裂線は損傷中心へ表示する。
 - HUD上部へ現在の自軍スライム数を表示する。
 
 ## 21. 表示仕様
@@ -1335,7 +1336,7 @@ shake =
 7. 片翼前進はArmySlimeの連続形状として実行され、独立部隊へ分裂しない。
 8. 回転は瞬間的な見た目変更ではなく、命令遅延と物理追従を持つ。
 9. 粒子は表示従属であり、プレイヤーの操作単位にしない。
-10. 安全幅ではリンク耐久度が回復し、限界幅では有限時間で切断される。
+10. 幅だけではリンクを損傷させず、敵圧による局所応力が実効靱性を超えた場合だけ耐久度を失う。
 11. 分裂前後で総質量を保存する。
 12. 分裂後の各スライムは、それぞれ独立した連続体として振る舞う。
 

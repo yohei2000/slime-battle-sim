@@ -1,40 +1,122 @@
-import type { ArmySlime } from "./types";
+import type { ArmySlime, SlimeLink, Vector2Like } from "./types";
 import { createArmySlime } from "./slime";
-import { add, clamp, clamp01, perpendicular, scale, sub } from "./vector";
+import {
+  add,
+  clamp,
+  clamp01,
+  distance,
+  dot,
+  lerp,
+  normalize,
+  perpendicular,
+  scale,
+  sub,
+} from "./vector";
 
 const MAX_SPLIT_GENERATION = 2;
 const MIN_SPLIT_MASS = 42;
+const REQUIRED_LOCAL_BREAKS = 2;
+
+type FractureSample = {
+  link: SlimeLink;
+  midpoint: Vector2Like;
+  severity: number;
+};
+
+function uniqueLinks(slime: ArmySlime): SlimeLink[] {
+  const links: SlimeLink[] = [];
+  const seen = new Set<string>();
+  for (const node of slime.nodes) {
+    for (const link of node.links) {
+      const key = [link.nodeAId, link.nodeBId].sort().join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      links.push(link);
+    }
+  }
+  return links;
+}
+
+function fractureSamples(slime: ArmySlime): FractureSample[] {
+  const byId = new Map(slime.nodes.map((node) => [node.id, node]));
+  return uniqueLinks(slime)
+    .filter((link) => link.broken || link.integrity < 0.82)
+    .flatMap((link) => {
+      const a = byId.get(link.nodeAId);
+      const b = byId.get(link.nodeBId);
+      if (!a || !b) return [];
+      return [
+        {
+          link,
+          midpoint: scale(add(a.position, b.position), 0.5),
+          severity: link.broken ? 1 : 1 - link.integrity,
+        },
+      ];
+    });
+}
 
 export function updateSplitStress(slime: ArmySlime, dt: number): void {
   slime.splitCooldown = Math.max(0, slime.splitCooldown - dt);
-  if (
-    slime.splitCooldown > 0 ||
-    slime.splitGeneration >= MAX_SPLIT_GENERATION ||
-    slime.mass < MIN_SPLIT_MASS
-  ) {
-    slime.splitStress = Math.max(0, slime.splitStress - 0.18 * dt);
+  const samples = fractureSamples(slime);
+
+  if (samples.length === 0) {
+    slime.fractureConcentration = 0;
+    slime.fractureLinkCount = 0;
+    slime.fractureCenter = { ...slime.center };
+    slime.fractureNormal = { ...slime.facing };
+    slime.splitStress = Math.max(0, slime.splitStress - 0.22 * dt);
     return;
   }
 
-  const splitWidth = slime.baseWidth * 1.45;
-  const overWidth = clamp01(
-    (slime.currentWidth - splitWidth) / Math.max(1, slime.baseWidth * 0.35),
+  const clusterRadius = Math.max(
+    54,
+    Math.min(slime.currentWidth, slime.currentDepth) * 0.42,
   );
-  const structuralDamage =
-    0.25 +
-    slime.tension * 0.55 +
-    slime.brokenLinkRatio * 1.8 +
-    (1 - slime.linkIntegrity) * 0.65;
-  const cohesionVulnerability = 0.5 + (100 - slime.cohesion) / 100;
-
-  if (overWidth > 0) {
-    slime.splitStress = clamp01(
-      slime.splitStress +
-        overWidth * structuralDamage * cohesionVulnerability * 0.68 * dt,
+  let strongestCluster: FractureSample[] = [];
+  let strongestWeight = 0;
+  for (const origin of samples) {
+    const cluster = samples.filter(
+      (candidate) => distance(origin.midpoint, candidate.midpoint) <= clusterRadius,
     );
-  } else {
-    slime.splitStress = Math.max(0, slime.splitStress - 0.14 * dt);
+    const weight = cluster.reduce((sum, sample) => sum + sample.severity, 0);
+    if (weight > strongestWeight) {
+      strongestWeight = weight;
+      strongestCluster = cluster;
+    }
   }
+
+  const totalWeight = Math.max(
+    0.001,
+    strongestCluster.reduce((sum, sample) => sum + sample.severity, 0),
+  );
+  slime.fractureCenter = scale(
+    strongestCluster.reduce(
+      (sum, sample) => add(sum, scale(sample.midpoint, sample.severity)),
+      { x: 0, y: 0 },
+    ),
+    1 / totalWeight,
+  );
+  const outward = sub(slime.fractureCenter, slime.center);
+  slime.fractureNormal =
+    Math.hypot(outward.x, outward.y) > 12
+      ? normalize(outward)
+      : normalize(slime.facing);
+  slime.fractureLinkCount = strongestCluster.filter(
+    (sample) => sample.link.broken,
+  ).length;
+  slime.fractureConcentration = clamp01(strongestWeight / 2.7);
+
+  const targetProgress = clamp01(
+    slime.fractureConcentration * 0.82 +
+      clamp01(slime.fractureLinkCount / REQUIRED_LOCAL_BREAKS) * 0.28,
+  );
+  slime.splitStress = clamp01(
+    lerp(
+      { x: slime.splitStress, y: 0 },
+      { x: targetProgress, y: 0 },
+      clamp01(dt * 3.2),
+    ).x,
+  );
 }
 
 export function shouldSplitSlime(slime: ArmySlime): boolean {
@@ -43,75 +125,87 @@ export function shouldSplitSlime(slime: ArmySlime): boolean {
     slime.splitGeneration < MAX_SPLIT_GENERATION &&
     slime.mass >= MIN_SPLIT_MASS &&
     slime.splitStress >= 0.72 &&
-    slime.brokenLinkRatio >= 0.08
+    slime.fractureConcentration >= 0.68 &&
+    slime.fractureLinkCount >= REQUIRED_LOCAL_BREAKS
   );
 }
 
 export function splitArmySlime(slime: ArmySlime): [ArmySlime, ArmySlime] {
   const nextGeneration = slime.splitGeneration + 1;
+  const separationAxis = normalize(slime.fractureNormal);
   const lateral = perpendicular(slime.facing);
+  const forwardAlignment = Math.abs(dot(separationAxis, slime.facing));
   const childWidth = clamp(
-    slime.currentWidth * 0.44,
-    Math.max(105, slime.baseWidth * 0.54),
+    slime.currentWidth * (0.48 + forwardAlignment * 0.32),
+    90,
+    250,
+  );
+  const childDepth = clamp(
+    slime.currentDepth * (0.82 - forwardAlignment * 0.32),
+    86,
     240,
   );
-  const childDepth = clamp(slime.currentDepth * 0.92, 100, 250);
-  const separation = childWidth * 0.48 + 20;
+  const projectedRadius =
+    Math.abs(dot(separationAxis, slime.facing)) * slime.currentDepth * 0.5 +
+    Math.abs(dot(separationAxis, lateral)) * slime.currentWidth * 0.5;
+  const separation = projectedRadius * 0.42 + 18;
   const remainingFlow = sub(slime.desiredCenter, slime.center);
-  const particleCount = Math.max(
-    32,
-    Math.floor(slime.particles.filter((particle) => particle.alive).length / 2),
-  );
+  const aliveParticles = slime.particles.filter((particle) => particle.alive).length;
+  const fragmentMass = slime.mass * 0.42;
+  const mainMass = slime.mass - fragmentMass;
+  const fragmentParticles = Math.max(24, Math.floor(aliveParticles * 0.42));
+  const mainParticles = Math.max(28, aliveParticles - fragmentParticles);
 
-  const leftCenter = add(slime.center, scale(lateral, separation));
-  const rightCenter = add(slime.center, scale(lateral, -separation));
-  const left = createArmySlime(
-    `${slime.id}-L${nextGeneration}`,
+  const fragmentCenter = add(slime.center, scale(separationAxis, separation));
+  const mainCenter = add(slime.center, scale(separationAxis, -separation * 0.72));
+  const fragment = createArmySlime(
+    `${slime.id}-F${nextGeneration}`,
     slime.side,
-    leftCenter,
+    fragmentCenter,
     slime.facing,
     {
       width: childWidth,
       depth: childDepth,
-      mass: slime.mass * 0.5,
-      particleCount,
+      mass: fragmentMass,
+      particleCount: fragmentParticles,
       splitGeneration: nextGeneration,
     },
   );
-  const right = createArmySlime(
-    `${slime.id}-R${nextGeneration}`,
+  const main = createArmySlime(
+    `${slime.id}-M${nextGeneration}`,
     slime.side,
-    rightCenter,
+    mainCenter,
     slime.facing,
     {
       width: childWidth,
       depth: childDepth,
-      mass: slime.mass * 0.5,
-      particleCount,
+      mass: mainMass,
+      particleCount: mainParticles,
       splitGeneration: nextGeneration,
     },
   );
 
-  for (const [child, side] of [
-    [left, 1],
-    [right, -1],
+  for (const [child, offset] of [
+    [fragment, 14],
+    [main, -10],
   ] as const) {
     child.posture = "neutral";
     child.desiredCenter = add(
       child.center,
-      add(scale(remainingFlow, 0.55), scale(lateral, side * 18)),
+      add(scale(remainingFlow, 0.48), scale(separationAxis, offset)),
     );
     child.desiredDirection = { ...slime.desiredDirection };
     child.facing = { ...slime.facing };
-    child.morale = clamp(slime.morale - 6, 0, 100);
-    child.cohesion = clamp(slime.cohesion - 18, 0, 100);
-    child.fatigue = clamp(slime.fatigue + 10, 0, 100);
+    child.morale = clamp(slime.morale - 7, 0, 100);
+    child.cohesion = clamp(slime.cohesion - 20, 0, 100);
+    child.fatigue = clamp(slime.fatigue + 11, 0, 100);
     child.pressure = clamp(slime.pressure + 12, 0, 100);
     child.encirclement = slime.encirclement * 0.65;
+    child.toughness = clamp(slime.toughness - 0.04, 0.42, 0.9);
     child.splitCooldown = 3.5;
   }
 
-  left.isSelected = slime.isSelected;
-  right.isSelected = false;
-  return [left, right];
+  fragment.isSelected = false;
+  main.isSelected = slime.isSelected;
+  return [fragment, main];
 }

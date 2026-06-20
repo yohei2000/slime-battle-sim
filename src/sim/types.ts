@@ -23,6 +23,8 @@ export type SlimeLink = {
   stiffness: number;
   damping: number;
   integrity: number;
+  stress: number;
+  localPressure: number;
   broken: boolean;
 };
 
@@ -124,6 +126,13 @@ export type ArmySlime = {
   aiThinkAt: number;
   linkIntegrity: number;
   brokenLinkRatio: number;
+  toughness: number;
+  effectiveToughness: number;
+  peakLocalStress: number;
+  fractureConcentration: number;
+  fractureLinkCount: number;
+  fractureCenter: Vector2Like;
+  fractureNormal: Vector2Like;
   splitStress: number;
   splitGeneration: number;
   splitCooldown: number;

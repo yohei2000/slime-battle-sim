@@ -92,6 +92,8 @@ export function createArmySlime(
       stiffness,
       damping: 0.72,
       integrity: 1,
+      stress: 0,
+      localPressure: 0,
       broken: false,
     };
     links.push(link);
@@ -170,6 +172,13 @@ export function createArmySlime(
     aiThinkAt: 0,
     linkIntegrity: 1,
     brokenLinkRatio: 0,
+    toughness: 0.68,
+    effectiveToughness: 0.68,
+    peakLocalStress: 0,
+    fractureConcentration: 0,
+    fractureLinkCount: 0,
+    fractureCenter: { ...center },
+    fractureNormal: direction,
     splitStress: 0,
     splitGeneration: options.splitGeneration ?? 0,
     splitCooldown: 0,
