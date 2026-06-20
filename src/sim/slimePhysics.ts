@@ -53,10 +53,10 @@ function updateDesiredShape(slime: ArmySlime): void {
 
 function applyOrderForces(slime: ArmySlime, forces: ForceMap): void {
   const flow = sub(slime.desiredCenter, slime.center);
-  const flowSpeed = Math.min(length(flow), slime.posture === "breakthrough" ? 115 : 78);
-  const flowForce = scale(normalize(flow), flowSpeed * 0.025);
+  const flowSpeed = Math.min(length(flow), slime.posture === "breakthrough" ? 92 : 58);
+  const flowForce = scale(normalize(flow), flowSpeed * 0.017);
   for (const node of slime.nodes) {
-    const shapeForce = scale(sub(node.targetPosition, node.position), 0.055 * slime.elasticity);
+    const shapeForce = scale(sub(node.targetPosition, node.position), 0.036 * slime.elasticity);
     addForce(forces, node, add(flowForce, shapeForce));
   }
 }
@@ -184,8 +184,8 @@ function applySpringForces(
       const relativeVelocity = dot(sub(b.velocity, a.velocity), direction);
       const cohesionStrength = 0.25 + slime.cohesion / 125;
       const magnitude =
-        stretch * link.stiffness * cohesionStrength * link.integrity * 0.022 +
-        relativeVelocity * link.damping * 0.08;
+        stretch * link.stiffness * cohesionStrength * link.integrity * 0.014 +
+        relativeVelocity * link.damping * 0.14;
       addForce(forces, a, scale(direction, magnitude));
       addForce(forces, b, scale(direction, -magnitude));
     }
@@ -204,7 +204,7 @@ function applyDensityForces(slime: ArmySlime, forces: ForceMap): void {
       const delta = sub(b.position, a.position);
       const gap = length(delta);
       if (gap > 0 && gap < 42) {
-        const push = scale(normalize(delta), (42 - gap) * 0.018);
+        const push = scale(normalize(delta), (42 - gap) * 0.012);
         addForce(forces, a, scale(push, -1));
         addForce(forces, b, push);
       }
@@ -337,9 +337,9 @@ function integrateNodes(
   for (const node of slime.nodes) {
     const force = forces.get(node.id) ?? { x: 0, y: 0 };
     node.velocity = add(node.velocity, scale(force, dt * 60 / node.mass));
-    node.velocity = scale(node.velocity, Math.pow(slime.viscosity, dt * 3.5));
+    node.velocity = scale(node.velocity, Math.pow(slime.viscosity, dt * 5.2));
     const speed = length(node.velocity);
-    if (speed > 120) node.velocity = scale(node.velocity, 120 / speed);
+    if (speed > 88) node.velocity = scale(node.velocity, 88 / speed);
     node.position = add(node.position, scale(node.velocity, dt));
   }
   enforceZocBoundary(slime, enemy);
