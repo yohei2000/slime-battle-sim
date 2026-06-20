@@ -60,9 +60,12 @@ export class MobileHUD {
   }
 
   update(): void {
-    const { player, enemy } = this.state;
+    const player =
+      this.state.playerSlimes.find((slime) => slime.isSelected) ??
+      this.state.player;
+    const enemy = this.state.enemy;
     this.playerStats.setText(
-      `自軍  士気 ${player.morale.toFixed(0)}  結束 ${player.cohesion.toFixed(0)}\n` +
+      `自軍×${this.state.playerSlimes.length}  士気 ${player.morale.toFixed(0)}  結束 ${player.cohesion.toFixed(0)}\n` +
         `命令 ${player.activeOrder?.status === "transmitting" ? `${player.commandDelay.toFixed(1)}秒` : "即応"}`,
     );
     this.enemyStats.setText(
@@ -73,7 +76,7 @@ export class MobileHUD {
       `姿勢 ${postureLabel(player.posture)}  密度 ${player.currentDensity.toFixed(2)}  幅 ${player.currentWidth.toFixed(0)}\n` +
         `疲労 ${player.fatigue.toFixed(0)}  圧力 ${player.pressure.toFixed(0)}  隙間 ${(player.gapRisk * 100).toFixed(0)}%  過密 ${(player.crowding * 100).toFixed(0)}%\n` +
         `向き ${Math.round((Math.atan2(player.facing.y, player.facing.x) * 180) / Math.PI)}°  翼 L${player.desiredLeftWingAdvance.toFixed(0)} / R${player.desiredRightWingAdvance.toFixed(0)}\n` +
-        `包囲力 ${(player.envelopPower * 100).toFixed(0)}  突破力 ${(player.breakthroughPower * 100).toFixed(0)}`,
+        `接続 ${(player.linkIntegrity * 100).toFixed(0)}%  分裂 ${(player.splitStress * 100).toFixed(0)}%  包囲力 ${(player.envelopPower * 100).toFixed(0)}  突破力 ${(player.breakthroughPower * 100).toFixed(0)}`,
     );
     const warnings: string[] = [];
     if (player.gapRisk > 0.45) warnings.push("戦線の隙間");
@@ -81,6 +84,7 @@ export class MobileHUD {
     if (player.isEncircling && ringIntegrity(player) < 0.46) warnings.push("包囲線が薄い");
     if (player.isEncircled) warnings.push("包囲されています");
     if (player.activeOrder?.status === "transmitting") warnings.push("命令伝達中");
+    if (player.splitStress > 0.45) warnings.push("接続が切れかけています");
     this.warningText.setText(warnings.length ? `⚠ ${warnings.join("\n⚠ ")}` : "形状は安定");
     this.pauseButton.label.setText(this.state.paused ? "▶" : "Ⅱ");
     this.speedButton.label.setText(`×${this.state.speed}`);

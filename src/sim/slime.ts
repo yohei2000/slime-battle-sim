@@ -12,6 +12,14 @@ import { add, normalize, perpendicular, rotate, scale } from "./vector";
 const RING_NODE_COUNT = 18;
 const PARTICLE_COUNT = 128;
 
+export type ArmySlimeOptions = {
+  width?: number;
+  depth?: number;
+  mass?: number;
+  particleCount?: number;
+  splitGeneration?: number;
+};
+
 function roleForAngle(angle: number): SlimeNodeRole {
   const forward = Math.cos(angle);
   const side = Math.sin(angle);
@@ -25,11 +33,14 @@ export function createArmySlime(
   side: Side,
   center: Vector2Like,
   facing: Vector2Like,
+  options: ArmySlimeOptions = {},
 ): ArmySlime {
   const direction = normalize(facing);
   const lateral = perpendicular(direction);
-  const width = 250;
-  const depth = 180;
+  const width = options.width ?? 250;
+  const depth = options.depth ?? 180;
+  const mass = options.mass ?? 100;
+  const particleCount = options.particleCount ?? PARTICLE_COUNT;
   const nodes: SlimeNode[] = [];
   const links: SlimeLink[] = [];
 
@@ -80,6 +91,8 @@ export function createArmySlime(
       restLength,
       stiffness,
       damping: 0.72,
+      integrity: 1,
+      broken: false,
     };
     links.push(link);
     a.links.push(link);
@@ -92,9 +105,9 @@ export function createArmySlime(
     if (i % 3 === 0) connect(nodes[i], nodes[(i + 3) % RING_NODE_COUNT], 0.22);
   }
 
-  const particles: SlimeParticle[] = Array.from({ length: PARTICLE_COUNT }, (_, i) => {
+  const particles: SlimeParticle[] = Array.from({ length: particleCount }, (_, i) => {
     const angle = (i * 2.399963229728653) % (Math.PI * 2);
-    const radius = Math.sqrt((i + 0.5) / PARTICLE_COUNT) * 0.88;
+    const radius = Math.sqrt((i + 0.5) / particleCount) * 0.88;
     const local = add(
       scale(direction, Math.cos(angle) * depth * 0.5 * radius),
       scale(lateral, Math.sin(angle) * width * 0.5 * radius),
@@ -126,10 +139,12 @@ export function createArmySlime(
     desiredDensity: 1,
     desiredLeftWingAdvance: 0,
     desiredRightWingAdvance: 0,
+    baseWidth: width,
+    baseDepth: depth,
     currentWidth: width,
     currentDepth: depth,
     currentDensity: 1,
-    mass: 100,
+    mass,
     morale: side === "player" ? 84 : 82,
     cohesion: 86,
     fatigue: 8,
@@ -153,6 +168,11 @@ export function createArmySlime(
     commandDelay: 0,
     shockTimer: 0,
     aiThinkAt: 0,
+    linkIntegrity: 1,
+    brokenLinkRatio: 0,
+    splitStress: 0,
+    splitGeneration: options.splitGeneration ?? 0,
+    splitCooldown: 0,
   };
 }
 

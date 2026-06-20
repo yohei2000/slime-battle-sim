@@ -43,7 +43,7 @@ export class BattleScene extends Phaser.Scene {
     this.touchController = new TouchInputController(
       this,
       this.cameraController,
-      () => this.simulation.state.player,
+      () => this.simulation.state.playerSlimes,
       () => this.simulation.state.elapsed,
       (preview: GesturePreviewState) => this.gesturePreview.setState(preview),
     );
@@ -88,8 +88,11 @@ export class BattleScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     this.simulation.update(delta / 1000);
-    const { player, enemy } = this.simulation.state;
-    this.slimeOverlay.draw([player, enemy], this.time.now);
+    const { enemy, playerSlimes, enemySlimes } = this.simulation.state;
+    const player =
+      playerSlimes.find((slime) => slime.isSelected) ??
+      this.simulation.state.player;
+    this.slimeOverlay.draw([...playerSlimes, ...enemySlimes], this.time.now);
     this.gesturePreview.draw(player);
     this.hud.update();
     this.debugOverlay.update(this.simulation.state);

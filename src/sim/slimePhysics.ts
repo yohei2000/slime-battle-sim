@@ -65,35 +65,63 @@ function applyOrderForces(slime: ArmySlime, forces: ForceMap): void {
   }
 }
 
-function applySpringForces(slime: ArmySlime, forces: ForceMap): void {
+function applySpringForces(slime: ArmySlime, forces: ForceMap, dt: number): void {
   const byId = new Map(slime.nodes.map((node) => [node.id, node]));
   const seen = new Set<string>();
+  let totalIntegrity = 0;
+  let linkCount = 0;
+  let brokenCount = 0;
   for (const node of slime.nodes) {
     for (const link of node.links) {
       const key = [link.nodeAId, link.nodeBId].sort().join("|");
       if (seen.has(key)) continue;
       seen.add(key);
+      linkCount += 1;
+      if (link.broken) {
+        brokenCount += 1;
+        continue;
+      }
       const a = byId.get(link.nodeAId);
       const b = byId.get(link.nodeBId);
       if (!a || !b) continue;
       const delta = sub(b.position, a.position);
       const currentLength = Math.max(0.001, length(delta));
+      const structuralStrain = currentLength / Math.max(0.001, link.restLength);
+      if (structuralStrain > 1.52) {
+        link.integrity -=
+          (structuralStrain - 1.52) *
+          0.9 *
+          (1 + (100 - slime.cohesion) / 80) *
+          dt;
+      } else if (structuralStrain < 1.3) {
+        link.integrity = Math.min(1, link.integrity + 0.12 * dt);
+      }
+      if (link.integrity <= 0) {
+        link.integrity = 0;
+        link.broken = true;
+        brokenCount += 1;
+        continue;
+      }
+      totalIntegrity += link.integrity;
       const targetScale =
         slime.currentWidth > 0 && (a.role === "left" || a.role === "right" || b.role === "left" || b.role === "right")
-          ? slime.desiredWidth / 250
-          : slime.desiredDepth / 180;
+          ? slime.desiredWidth / slime.baseWidth
+          : slime.desiredDepth / slime.baseDepth;
       const targetLength = link.restLength * clamp(targetScale, 0.62, 1.62);
       const stretch = currentLength - targetLength;
       const direction = scale(delta, 1 / currentLength);
       const relativeVelocity = dot(sub(b.velocity, a.velocity), direction);
       const cohesionStrength = 0.25 + slime.cohesion / 125;
       const magnitude =
-        stretch * link.stiffness * cohesionStrength * 0.022 +
+        stretch * link.stiffness * cohesionStrength * link.integrity * 0.022 +
         relativeVelocity * link.damping * 0.08;
       addForce(forces, a, scale(direction, magnitude));
       addForce(forces, b, scale(direction, -magnitude));
     }
   }
+  slime.brokenLinkRatio = linkCount > 0 ? brokenCount / linkCount : 0;
+  slime.linkIntegrity =
+    linkCount > 0 ? totalIntegrity / Math.max(1, linkCount - brokenCount) : 1;
 }
 
 function applyDensityForces(slime: ArmySlime, forces: ForceMap): void {
@@ -256,10 +284,21 @@ function updateDerivedStats(slime: ArmySlime, dt: number): void {
   const projectedSide = boundary.map((node) => dot(sub(node.position, slime.center), lateral));
   slime.currentDepth = Math.max(...projectedForward) - Math.min(...projectedForward);
   slime.currentWidth = Math.max(...projectedSide) - Math.min(...projectedSide);
-  const areaRatio = (250 * 180) / Math.max(11000, slime.currentWidth * slime.currentDepth);
+  const areaRatio =
+    (slime.baseWidth * slime.baseDepth) /
+    Math.max(
+      slime.baseWidth * slime.baseDepth * 0.245,
+      slime.currentWidth * slime.currentDepth,
+    );
   slime.currentDensity = clamp(areaRatio, 0.55, 1.82);
-  slime.tension = clamp01(Math.max(0, slime.currentWidth / 250 - 1) * 0.9 + (100 - slime.cohesion) / 210);
-  const overExtension = clamp01((slime.currentWidth - 285) / 180);
+  slime.tension = clamp01(
+    Math.max(0, slime.currentWidth / slime.baseWidth - 1) * 0.9 +
+      (100 - slime.cohesion) / 210,
+  );
+  const overExtension = clamp01(
+    (slime.currentWidth - slime.baseWidth * 1.14) /
+      (slime.baseWidth * 0.72),
+  );
   const lowDensity = clamp01((1.05 - slime.currentDensity) / 0.45);
   const lowCohesion = clamp01((72 - slime.cohesion) / 72);
   slime.gapRisk = clamp01(
@@ -306,7 +345,7 @@ export function updateSlime(
   updateDesiredShape(slime);
   const forces: ForceMap = new Map();
   applyOrderForces(slime, forces);
-  applySpringForces(slime, forces);
+  applySpringForces(slime, forces, dt);
   applyDensityForces(slime, forces);
   applyZocForces(slime, enemy, forces);
   applyTerrainForces(slime, forces, bounds);

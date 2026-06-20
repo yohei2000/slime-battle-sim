@@ -22,6 +22,8 @@ export type SlimeLink = {
   restLength: number;
   stiffness: number;
   damping: number;
+  integrity: number;
+  broken: boolean;
 };
 
 export type SlimeNode = {
@@ -91,6 +93,8 @@ export type ArmySlime = {
   desiredDensity: number;
   desiredLeftWingAdvance: number;
   desiredRightWingAdvance: number;
+  baseWidth: number;
+  baseDepth: number;
   currentWidth: number;
   currentDepth: number;
   currentDensity: number;
@@ -118,6 +122,11 @@ export type ArmySlime = {
   commandDelay: number;
   shockTimer: number;
   aiThinkAt: number;
+  linkIntegrity: number;
+  brokenLinkRatio: number;
+  splitStress: number;
+  splitGeneration: number;
+  splitCooldown: number;
 };
 
 export type GesturePreviewState = {
@@ -148,6 +157,8 @@ export type GesturePreviewState = {
 export type BattleState = {
   player: ArmySlime;
   enemy: ArmySlime;
+  playerSlimes: ArmySlime[];
+  enemySlimes: ArmySlime[];
   elapsed: number;
   speed: number;
   paused: boolean;

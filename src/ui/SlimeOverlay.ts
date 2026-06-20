@@ -132,6 +132,30 @@ export class SlimeOverlay {
       this.effectGraphics.fillStyle(0xff9f43, 0.08 + slime.crowding * 0.12);
       this.effectGraphics.fillCircle(slime.center.x, slime.center.y, 58 + slime.crowding * 30);
     }
+    if (slime.splitStress > 0.18 || slime.brokenLinkRatio > 0) {
+      const tangent = perpendicular(slime.facing);
+      const crackLength = slime.currentDepth * 0.42;
+      const segments = 7;
+      this.effectGraphics.lineStyle(
+        3 + slime.splitStress * 5,
+        0xffd166,
+        0.45 + slime.splitStress * 0.5,
+      );
+      this.effectGraphics.beginPath();
+      for (let i = 0; i <= segments; i += 1) {
+        const t = i / segments - 0.5;
+        const point = add(
+          slime.center,
+          add(
+            scale(slime.facing, t * crackLength * 2),
+            scale(tangent, Math.sin(i * 2.3) * (4 + slime.splitStress * 12)),
+          ),
+        );
+        if (i === 0) this.effectGraphics.moveTo(point.x, point.y);
+        else this.effectGraphics.lineTo(point.x, point.y);
+      }
+      this.effectGraphics.strokePath();
+    }
   }
 
   private drawContacts(slime: ArmySlime, color: number): void {

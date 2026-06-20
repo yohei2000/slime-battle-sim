@@ -24,7 +24,7 @@ export class TouchInputController {
   constructor(
     private readonly scene: Phaser.Scene,
     private readonly cameraController: CameraController,
-    private readonly getPlayer: () => ArmySlime,
+    private readonly getPlayers: () => ArmySlime[],
     private readonly getNow: () => number,
     private readonly onPreview: (preview: GesturePreviewState) => void,
   ) {
@@ -43,11 +43,23 @@ export class TouchInputController {
     return this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
   }
 
+  private selectedPlayer(): ArmySlime {
+    const players = this.getPlayers();
+    return players.find((slime) => slime.isSelected) ?? players[0];
+  }
+
   private onDown(pointer: Phaser.Input.Pointer): void {
     if (this.ignoreInput) return;
     const world = this.world(pointer);
-    const slime = this.getPlayer();
-    const tactical = slime.isSelected && pointInsideSlime(slime, world, 75);
+    const players = this.getPlayers();
+    const touched = players.find((slime) => pointInsideSlime(slime, world, 35));
+    if (touched) {
+      players.forEach((slime) => {
+        slime.isSelected = slime === touched;
+      });
+    }
+    const slime = touched ?? this.selectedPlayer();
+    const tactical = Boolean(touched) || (slime.isSelected && pointInsideSlime(slime, world, 75));
     this.pointers.set(pointer.id, {
       pointer,
       startScreen: { x: pointer.x, y: pointer.y },
@@ -70,7 +82,7 @@ export class TouchInputController {
     const record = this.pointers.get(pointer.id);
     if (!record || !pointer.isDown || this.ignoreInput) return;
     const screen = { x: pointer.x, y: pointer.y };
-    const slime = this.getPlayer();
+    const slime = this.selectedPlayer();
 
     if (this.pointers.size >= 2) {
       const records = [...this.pointers.values()].slice(0, 2);
@@ -109,7 +121,7 @@ export class TouchInputController {
   private onUp(pointer: Phaser.Input.Pointer): void {
     const record = this.pointers.get(pointer.id);
     if (!record) return;
-    const slime = this.getPlayer();
+    const slime = this.selectedPlayer();
     const wasMulti = this.pointers.size >= 2;
 
     if (wasMulti && slime.isSelected) {
@@ -120,7 +132,13 @@ export class TouchInputController {
         slime.isSelected = true;
       }
     } else if (distance(record.startScreen, { x: pointer.x, y: pointer.y }) < 14) {
-      slime.isSelected = pointInsideSlime(slime, this.world(pointer), 20);
+      const world = this.world(pointer);
+      const touched = this.getPlayers().find((candidate) =>
+        pointInsideSlime(candidate, world, 20),
+      );
+      this.getPlayers().forEach((candidate) => {
+        candidate.isSelected = candidate === touched;
+      });
     }
 
     this.pointers.delete(pointer.id);
