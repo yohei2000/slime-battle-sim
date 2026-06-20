@@ -114,11 +114,8 @@ export class SlimeOverlay {
       slime.isSelected ? 0.98 : 0.75,
     );
     drawPolygon(this.bodyGraphics, points);
+    this.drawNodeDensity(slime, color.fill);
     this.drawStressNetwork(slime, time);
-
-    const coreRadius = 24 + slime.currentDensity * 8;
-    this.bodyGraphics.fillStyle(color.fill, 0.22);
-    this.bodyGraphics.fillCircle(slime.center.x, slime.center.y, coreRadius);
 
     for (const particle of slime.particles) {
       if (!particle.alive) continue;
@@ -130,6 +127,23 @@ export class SlimeOverlay {
     this.drawFacing(slime, color.edge);
     this.drawWarnings(slime, boundary, time);
     this.drawContacts(slime, color.edge);
+  }
+
+  private drawNodeDensity(slime: ArmySlime, fillColor: number): void {
+    for (const node of slime.nodes) {
+      const isCore = node.id.endsWith("-core");
+      const isInterior = node.role === "interior";
+      const radius =
+        (isCore ? 21 : isInterior ? 15 : 10) *
+        (0.82 + slime.currentDensity * 0.18);
+      const pressureAlpha = clamp(node.localPressure / 160, 0, 0.16);
+      const densityAlpha =
+        (isCore ? 0.16 : isInterior ? 0.105 : 0.055) +
+        slime.currentDensity * 0.035 +
+        pressureAlpha;
+      this.bodyGraphics.fillStyle(fillColor, densityAlpha);
+      this.bodyGraphics.fillCircle(node.position.x, node.position.y, radius);
+    }
   }
 
   private stressColor(loadRatio: number): number {

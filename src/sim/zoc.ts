@@ -1,5 +1,5 @@
 import type { ArmySlime, SlimeNode, Vector2Like } from "./types";
-import { add, clamp, clamp01, distance, dot, normalize, scale, sub } from "./vector";
+import { add, average, clamp, clamp01, distance, dot, normalize, scale, sub } from "./vector";
 
 export type ZocBoundarySample = {
   closestPoint: Vector2Like;
@@ -13,7 +13,14 @@ export type ZocBoundarySample = {
 };
 
 function boundary(slime: ArmySlime): SlimeNode[] {
-  return slime.nodes.filter((node) => node.role !== "interior");
+  const nodes = slime.nodes.filter((node) => node.role !== "interior");
+  if (nodes.length < 3) return nodes;
+  const center = average(nodes.map((node) => node.position));
+  return [...nodes].sort(
+    (a, b) =>
+      Math.atan2(a.position.y - center.y, a.position.x - center.x) -
+      Math.atan2(b.position.y - center.y, b.position.x - center.x),
+  );
 }
 
 function closestPointOnSegment(

@@ -9,6 +9,7 @@ import type {
 } from "./types";
 import {
   add,
+  average,
   distance,
   normalize,
   perpendicular,
@@ -261,7 +262,14 @@ export function createArmySlime(
 }
 
 export function getBoundaryNodes(slime: ArmySlime): SlimeNode[] {
-  return slime.nodes.filter((node) => node.role !== "interior");
+  const boundary = slime.nodes.filter((node) => node.role !== "interior");
+  if (boundary.length < 3) return boundary;
+  const center = average(boundary.map((node) => node.position));
+  return [...boundary].sort(
+    (a, b) =>
+      Math.atan2(a.position.y - center.y, a.position.x - center.x) -
+      Math.atan2(b.position.y - center.y, b.position.x - center.x),
+  );
 }
 
 export function pointInsideSlime(
