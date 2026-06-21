@@ -17,7 +17,7 @@ import type {
 const TERRAIN_LABELS: Record<TerrainType, string> = {
   marsh: "湿地",
   plain: "草原",
-  forest: "胞子森",
+  forest: "深森",
   cavern: "石灰洞",
   salt: "塩湖",
   ruin: "廃墟",
@@ -50,7 +50,7 @@ export function createInitialCampaignState(): CampaignState {
       name: "Verdant Brood",
       color: 0x63d471,
       accentColor: "#9aff9f",
-      battleStyle: "増殖重視",
+      battleStyle: "補充重視",
     },
     {
       id: "amber",
@@ -92,7 +92,7 @@ export function createInitialCampaignState(): CampaignState {
     },
     {
       id: "thin-grass",
-      name: "薄膜草原",
+      name: "薄草平原",
       terrain: "plain",
       ownerFactionId: "player",
       x: 0.34,
@@ -106,7 +106,7 @@ export function createInitialCampaignState(): CampaignState {
     },
     {
       id: "sporewood",
-      name: "胞子森",
+      name: "深森前線",
       terrain: "forest",
       ownerFactionId: "verdant",
       x: 0.43,
@@ -201,7 +201,7 @@ export function createInitialCampaignState(): CampaignState {
     diplomacyUsed: false,
     reports: [
       "戦略マップを展開しました",
-      "胞子森では Verdant Brood が境界を押しています",
+      "深森前線では Verdant Brood が境界を押しています",
       "内政と外交を1手ずつ試せます",
     ],
   };
@@ -236,25 +236,25 @@ export function applyDomesticOrder(
     army.cohesion = clamp(army.cohesion - 6, 0, 100);
     army.fatigue = clamp(army.fatigue + 3, 0, 100);
     army.commandDelay = round1(army.commandDelay + 0.08);
-    report = "増殖槽を開放: 質量+8、結束と即応性が低下";
+    report = "補充兵を招集: 兵力+8、結束と即応性が低下";
   }
   if (orderId === "rest") {
     army.fatigue = clamp(army.fatigue - 14, 0, 100);
     army.morale = clamp(army.morale + 2, 0, 100);
     army.commandDelay = round1(Math.max(0.1, army.commandDelay - 0.04));
-    report = "休眠回復: 疲労を大きく下げ、命令伝達も少し安定";
+    report = "休整令: 疲労を大きく下げ、命令伝達も少し安定";
   }
   if (orderId === "cohesion") {
     army.cohesion = clamp(army.cohesion + 8, 0, 100);
     army.morale = clamp(army.morale + 5, 0, 100);
     army.commandDelay = round1(Math.max(0.1, army.commandDelay - 0.1));
-    report = "結束儀式: 士気と結束を上げ、包囲維持に強くなる";
+    report = "軍紀再編: 士気と結束を上げ、包囲維持に強くなる";
   }
   if (orderId === "hardening") {
     army.toughness = round2(clamp(army.toughness + 0.04, 0.42, 0.9));
     army.fatigue = clamp(army.fatigue + 2, 0, 100);
     army.commandDelay = round1(army.commandDelay + 0.05);
-    report = "外殻硬化: 靱性が上がるが、少し重くなる";
+    report = "防備強化: 防御が上がるが、少し重くなる";
   }
 
   return {
@@ -507,7 +507,7 @@ export function canUseDiplomacyAction(
 }
 
 export function resourceText(resources: RegionResources): string {
-  return `栄養 ${resources.nutrient}  胞子 ${resources.spores}  粘液 ${resources.gel}  外殻 ${resources.shell}  記憶 ${resources.memory}`;
+  return `糧秣 ${resources.nutrient}  斥候 ${resources.spores}  工材 ${resources.gel}  甲材 ${resources.shell}  記録 ${resources.memory}`;
 }
 
 function relation(
@@ -570,11 +570,11 @@ function enemySeedForFaction(factionId: FactionId, region: RegionNode) {
 }
 
 function terrainBattleNotes(terrain: TerrainType): string[] {
-  if (terrain === "marsh") return ["湿地: 粘性が上がり、突破が鈍る"];
-  if (terrain === "forest") return ["胞子森: 結束が戻りやすいが、接触線が乱れやすい"];
+  if (terrain === "marsh") return ["湿地: 足場が重く、突破が鈍る"];
+  if (terrain === "forest") return ["深森: 結束が戻りやすいが、接触線が乱れやすい"];
   if (terrain === "cavern") return ["石灰洞: 戦線幅が狭く、包囲が難しい"];
   if (terrain === "salt") return ["塩湖: 初期疲労が増え、長期戦が危険"];
-  if (terrain === "ruin") return ["廃墟: 外殻と記憶資源が多く、硬い敵が出やすい"];
+  if (terrain === "ruin") return ["廃墟: 甲材と記録資源が多く、防御的な敵が出やすい"];
   return ["草原: 幅を取りやすく、包囲と突破の両方が起きる"];
 }
 

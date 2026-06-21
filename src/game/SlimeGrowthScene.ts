@@ -156,12 +156,12 @@ export class SlimeGrowthScene extends Phaser.Scene {
   private addBackground(width: number, height: number): void {
     this.addCoverImage(GROWTH_BACKGROUND_KEY, width, height, 0.95, -4);
     const graphics = this.add.graphics();
-    graphics.fillStyle(0x071118, 0.44);
+    graphics.fillStyle(0x071118, 0.18);
     graphics.fillRect(0, 0, width, height);
-    graphics.lineStyle(1, 0x163342, 0.26);
+    graphics.lineStyle(1, 0x163342, 0.16);
     for (let x = 0; x <= width; x += 64) graphics.lineBetween(x, 0, x, height);
     for (let y = 0; y <= height; y += 64) graphics.lineBetween(0, y, width, y);
-    graphics.lineStyle(1, 0x2b5363, 0.12);
+    graphics.lineStyle(1, 0x2b5363, 0.08);
     for (let i = 0; i < 18; i += 1) {
       const x = (i * 193) % width;
       graphics.lineBetween(x, 64, x + 140, height);
@@ -173,8 +173,8 @@ export class SlimeGrowthScene extends Phaser.Scene {
   private addWarRoomBackdrop(width: number, height: number): void {
     const operationZones = [
       { x: width * 0.16, y: height * 0.22, w: width * 0.48, h: height * 0.28, c: 0x174e5f, a: 0.14 },
-      { x: width * 0.78, y: height * 0.34, w: width * 0.42, h: height * 0.3, c: 0x2bd6a3, a: 0.08 },
-      { x: width * 0.52, y: height * 0.76, w: width * 0.68, h: height * 0.22, c: 0x35d8ff, a: 0.07 },
+      { x: width * 0.78, y: height * 0.34, w: width * 0.42, h: height * 0.3, c: 0x2bd6a3, a: 0.055 },
+      { x: width * 0.52, y: height * 0.76, w: width * 0.68, h: height * 0.22, c: 0x35d8ff, a: 0.05 },
     ];
 
     operationZones.forEach((zone, index) => {
@@ -218,7 +218,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
   }
 
   private addHeader(width: number, compact: boolean): void {
-    const header = this.add.rectangle(0, 0, width, 64, 0x0b1a23, 0.95).setOrigin(0);
+    const header = this.add.rectangle(0, 0, width, 64, 0x0b1a23, 0.88).setOrigin(0);
     this.objects.push(header);
     this.addText(18, 10, "軍制成長", compact ? 22 : 25, "#eafaff", 700);
     this.addText(
@@ -265,7 +265,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
     this.animatedCoreCenter = center;
     this.animatedCoreRadius = radius;
 
-    graphics.fillStyle(0x0b2230, 0.92);
+    graphics.fillStyle(0x0b2230, 0.78);
     graphics.fillEllipse(center.x, center.y, radius * 2.18, radius * 1.66);
     graphics.lineStyle(3, 0x7cecff, 0.28);
     graphics.strokeEllipse(center.x, center.y, radius * 2.18, radius * 1.66);
@@ -326,7 +326,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
       const color = definition?.color ?? 0x2b5363;
       const fill = slot.skillId ? 0x102632 : 0x091722;
       const pill = this.add
-        .rectangle(px, py, pillWidth, pillHeight, fill, slot.skillId ? 0.96 : 0.72)
+        .rectangle(px, py, pillWidth, pillHeight, fill, slot.skillId ? 0.86 : 0.66)
         .setOrigin(0)
         .setStrokeStyle(slot.evolved ? 2 : 1, slot.evolved ? 0xffd166 : color, slot.skillId ? 0.82 : 0.42)
         .setDepth(3);
@@ -585,10 +585,10 @@ export class SlimeGrowthScene extends Phaser.Scene {
     compact: boolean,
   ): void {
     const definition = skillDefinition(choice.skillId);
-    const artSize = compact ? Math.min(52, height - 12) : Math.min(88, height - 30);
-    const textWidth = Math.max(96, width - artSize - (compact ? 42 : 56));
+    const artSize = compact ? Math.min(58, height - 12) : Math.min(118, height - 28);
+    const textWidth = Math.max(96, width - artSize - (compact ? 44 : 72));
     const background = this.add
-      .rectangle(x, y, width, height, 0x102632, 0.96)
+      .rectangle(x, y, width, height, 0x102632, 0.82)
       .setOrigin(0)
       .setStrokeStyle(choice.kind === "evolve" ? 3 : 2, choice.kind === "evolve" ? 0xffd166 : definition.color, 0.82)
       .setInteractive({ useHandCursor: true })
@@ -607,7 +607,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
       .setDepth(6);
     this.addSkillImage(
       choice.skillId,
-      x + width - artSize / 2 - (compact ? 12 : 18),
+      x + width - artSize / 2 - (compact ? 12 : 24),
       y + height / 2,
       artSize,
       compact ? 0.82 : 0.9,
@@ -633,8 +633,8 @@ export class SlimeGrowthScene extends Phaser.Scene {
       repeat: -1,
       ease: "Sine.easeInOut",
     });
-    background.on("pointerdown", () => background.setFillStyle(0x183b4a, 1));
-    background.on("pointerout", () => background.setFillStyle(0x102632, 0.96));
+    background.on("pointerdown", () => background.setFillStyle(0x183b4a, 0.92));
+    background.on("pointerout", () => background.setFillStyle(0x102632, 0.82));
     background.on("pointerup", () => {
       this.growth = applySkillChoice(this.growth, choice.skillId);
       this.redraw();
@@ -672,9 +672,9 @@ export class SlimeGrowthScene extends Phaser.Scene {
 
   private frame(rect: Rect, title: string): void {
     const frame = this.add
-      .rectangle(rect.x, rect.y, rect.width, rect.height, 0x0a1a23, 0.94)
+      .rectangle(rect.x, rect.y, rect.width, rect.height, 0x0a1a23, 0.74)
       .setOrigin(0)
-      .setStrokeStyle(2, 0x2b5363, 0.78);
+      .setStrokeStyle(2, 0x2b5363, 0.86);
     this.objects.push(frame);
     this.addText(rect.x + 14, rect.y + 11, title, 15, "#eafaff", 700, rect.width - 28);
   }
@@ -735,6 +735,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
       lineSpacing: 3,
       wordWrap: wrapWidth ? { width: wrapWidth, useAdvancedWrap: true } : undefined,
     });
+    object.setShadow(0, 2, "#001018", 4, true, true);
     this.objects.push(object);
     return object;
   }

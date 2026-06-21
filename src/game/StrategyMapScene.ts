@@ -36,10 +36,10 @@ type TextButton = {
 };
 
 const DOMESTIC_ACTIONS: Array<{ id: DomesticOrderId; label: string }> = [
-  { id: "growth", label: "増殖" },
-  { id: "rest", label: "休眠" },
+  { id: "growth", label: "補充" },
+  { id: "rest", label: "休整" },
   { id: "cohesion", label: "結束" },
-  { id: "hardening", label: "硬化" },
+  { id: "hardening", label: "防備" },
 ];
 
 const DIPLOMACY_ACTIONS: Array<{ id: DiplomacyActionId; label: string }> = [
@@ -119,33 +119,46 @@ export class StrategyMapScene extends Phaser.Scene {
   private addBackground(width: number, height: number): void {
     this.addCoverImage(STRATEGY_BACKGROUND_KEY, width, height, 0.92, -4);
     const graphics = this.add.graphics();
-    graphics.fillStyle(0x071118, 0.48);
+    graphics.fillStyle(0x071118, 0.20);
     graphics.fillRect(0, 0, width, height);
-    graphics.lineStyle(1, 0x163342, 0.25);
+    graphics.lineStyle(1, 0x163342, 0.14);
     for (let x = 0; x <= width; x += 72) graphics.lineBetween(x, 0, x, height);
     for (let y = 0; y <= height; y += 72) graphics.lineBetween(0, y, width, y);
     this.objects.push(graphics);
   }
 
   private addHeader(width: number): void {
-    const header = this.add.rectangle(0, 0, width, 64, 0x0b1a23, 0.94).setOrigin(0);
+    const header = this.add.rectangle(0, 0, width, 64, 0x0b1a23, 0.88).setOrigin(0);
     this.objects.push(header);
 
     this.addText(18, 12, "戦略マップ", 24, "#eafaff", 700);
-    this.addText(18, 42, `Turn ${this.state.turn}`, 13, "#7cecff", 700);
-    const compactResources =
-      width < 580
-        ? `栄${this.state.resources.nutrient} 胞${this.state.resources.spores} 粘${this.state.resources.gel}\n殻${this.state.resources.shell} 記${this.state.resources.memory}`
-        : resourceText(this.state.resources);
+    const compactHeader = width < 580;
     this.addText(
-      width < 580 ? 132 : Math.min(190, width * 0.38),
-      width < 580 ? 12 : 18,
-      compactResources,
-      width < 580 ? 10 : 13,
-      "#cdefff",
-      600,
-      width < 580 ? 96 : Math.max(180, width - 210),
+      18,
+      42,
+      compactHeader
+        ? `T${this.state.turn}  糧${this.state.resources.nutrient} 偵${this.state.resources.spores} 工${this.state.resources.gel} 甲${this.state.resources.shell} 記${this.state.resources.memory}`
+        : `Turn ${this.state.turn}`,
+      compactHeader ? 10 : 13,
+      "#7cecff",
+      700,
+      compactHeader ? Math.max(180, width - 170) : undefined,
     );
+    const compactResources =
+      compactHeader
+        ? `糧${this.state.resources.nutrient} 偵${this.state.resources.spores} 工${this.state.resources.gel}\n甲${this.state.resources.shell} 記${this.state.resources.memory}`
+        : resourceText(this.state.resources);
+    if (!compactHeader) {
+      this.addText(
+        Math.min(190, width * 0.38),
+        18,
+        compactResources,
+        13,
+        "#cdefff",
+        600,
+        Math.max(180, width - 210),
+      );
+    }
 
     const buttonWidth = width < 580 ? 62 : 82;
     this.makeButton(
@@ -178,10 +191,10 @@ export class StrategyMapScene extends Phaser.Scene {
         this.mapRect.width,
         this.mapRect.height,
         0x0a1a23,
-        0.9,
+        0.76,
       )
       .setOrigin(0)
-      .setStrokeStyle(2, 0x2b5363, 0.8);
+      .setStrokeStyle(2, 0x2b5363, 0.86);
     this.objects.push(frame);
 
     const title = this.addText(
@@ -265,10 +278,10 @@ export class StrategyMapScene extends Phaser.Scene {
         this.panelRect.width,
         this.panelRect.height,
         0x0b1a23,
-        0.92,
+        0.78,
       )
       .setOrigin(0)
-      .setStrokeStyle(2, 0x2b5363, 0.74);
+      .setStrokeStyle(2, 0x2b5363, 0.84);
     this.objects.push(panel);
 
     const selected = selectedRegion(this.state);
@@ -309,13 +322,13 @@ export class StrategyMapScene extends Phaser.Scene {
     );
     y += compact ? 34 : 42;
 
-    this.addText(x, y, "群体", 13, "#7cecff", 700);
+    this.addText(x, y, "軍団", 13, "#7cecff", 700);
     y += 20;
     this.addText(
       x,
       y,
-      `質量 ${this.state.army.mass}  士気 ${this.state.army.morale}  結束 ${this.state.army.cohesion}\n` +
-        `疲労 ${this.state.army.fatigue}  靱性 ${this.state.army.toughness.toFixed(2)}  命令 ${this.state.army.commandDelay.toFixed(1)}秒`,
+      `兵力 ${this.state.army.mass}  士気 ${this.state.army.morale}  結束 ${this.state.army.cohesion}\n` +
+        `疲労 ${this.state.army.fatigue}  防御 ${this.state.army.toughness.toFixed(2)}  命令 ${this.state.army.commandDelay.toFixed(1)}秒`,
       compact ? 11 : 12,
       "#d8f4ff",
       500,
@@ -415,8 +428,8 @@ export class StrategyMapScene extends Phaser.Scene {
   ): void {
     const text =
       `${preview.title} / 目的 ${preview.objective}\n` +
-      `自軍 質${preview.playerInitial.mass} 士${preview.playerInitial.morale} 結${preview.playerInitial.cohesion} 疲${preview.playerInitial.fatigue}\n` +
-      `敵軍 質${preview.enemyInitial.mass} 士${preview.enemyInitial.morale} 結${preview.enemyInitial.cohesion} 疲${preview.enemyInitial.fatigue}\n` +
+      `自軍 兵${preview.playerInitial.mass} 士${preview.playerInitial.morale} 結${preview.playerInitial.cohesion} 疲${preview.playerInitial.fatigue}\n` +
+      `敵軍 兵${preview.enemyInitial.mass} 士${preview.enemyInitial.morale} 結${preview.enemyInitial.cohesion} 疲${preview.enemyInitial.fatigue}\n` +
       (compact
         ? `${preview.terrainNotes[0]}\n${preview.strategicNotes[0]}`
         : `${preview.terrainNotes[0]}\n${preview.strategicNotes.slice(0, 4).join(" / ")}`);
@@ -525,6 +538,7 @@ export class StrategyMapScene extends Phaser.Scene {
       lineSpacing: 3,
       wordWrap: wrapWidth ? { width: wrapWidth, useAdvancedWrap: true } : undefined,
     });
+    object.setShadow(0, 2, "#001018", 4, true, true);
     this.objects.push(object);
     return object;
   }

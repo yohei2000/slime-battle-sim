@@ -47,14 +47,24 @@ function Save-Bitmap([string]$Path, [int]$Width, [int]$Height, [scriptblock]$Dra
 
 function Draw-Texture([System.Drawing.Graphics]$G, [int]$W, [int]$H, [int]$Seed) {
   $random = [System.Random]::new($Seed)
-  for ($i = 0; $i -lt 820; $i++) {
+  $count = [Math]::Max(1200, [int](($W * $H) / 1400))
+  for ($i = 0; $i -lt $count; $i++) {
     $x = $random.NextDouble() * $W
     $y = $random.NextDouble() * $H
-    $a = 10 + $random.Next(26)
+    $a = 8 + $random.Next(28)
     $brush = BrushA $a (140 + $random.Next(80)) (170 + $random.Next(60)) (170 + $random.Next(70))
-    $size = 0.7 + $random.NextDouble() * 2.2
+    $size = 0.9 + $random.NextDouble() * 3.5
     $G.FillEllipse($brush, $x, $y, $size, $size)
     $brush.Dispose()
+  }
+
+  for ($i = 0; $i -lt 70; $i++) {
+    $x = $random.NextDouble() * $W
+    $y = $random.NextDouble() * $H
+    $length = 80 + $random.NextDouble() * 260
+    $pen = PenA (14 + $random.Next(26)) (120 + $random.Next(80)) (160 + $random.Next(70)) (170 + $random.Next(65)) (1 + $random.NextDouble() * 3)
+    $G.DrawLine($pen, $x, $y, $x + $length, $y - 20 + $random.NextDouble() * 40)
+    $pen.Dispose()
   }
 }
 
@@ -63,6 +73,32 @@ function Fill-Gradient([System.Drawing.Graphics]$G, [int]$W, [int]$H, [System.Dr
   $brush = [System.Drawing.Drawing2D.LinearGradientBrush]::new($rect, $Top, $Bottom, 90)
   $G.FillRectangle($brush, $rect)
   $brush.Dispose()
+}
+
+function Draw-HumanFigure([System.Drawing.Graphics]$G, [float]$X, [float]$Y, [float]$S, [System.Drawing.Color]$Coat, [System.Drawing.Color]$Accent) {
+  $shadow = BrushA 120 0 0 0
+  $G.FillEllipse($shadow, $X - 15 * $S, $Y + 35 * $S, 30 * $S, 7 * $S)
+  $shadow.Dispose()
+
+  $coatBrush = [System.Drawing.SolidBrush]::new($Coat)
+  $accentPen = [System.Drawing.Pen]::new($Accent, 1.6 * $S)
+  $skin = BrushA 225 203 166 124
+  $dark = BrushA 230 8 12 16
+  $G.FillEllipse($skin, $X - 5 * $S, $Y - 26 * $S, 10 * $S, 12 * $S)
+  $G.FillPolygon($coatBrush, [System.Drawing.PointF[]]@(
+    [System.Drawing.PointF]::new($X - 10 * $S, $Y - 12 * $S),
+    [System.Drawing.PointF]::new($X + 11 * $S, $Y - 12 * $S),
+    [System.Drawing.PointF]::new($X + 15 * $S, $Y + 32 * $S),
+    [System.Drawing.PointF]::new($X - 14 * $S, $Y + 32 * $S)
+  ))
+  $G.FillRectangle($dark, (RectF ($X - 12 * $S) ($Y + 29 * $S) (8 * $S) (18 * $S)))
+  $G.FillRectangle($dark, (RectF ($X + 4 * $S) ($Y + 29 * $S) (8 * $S) (18 * $S)))
+  $G.DrawLine($accentPen, $X - 8 * $S, $Y + 2 * $S, $X + 9 * $S, $Y + 2 * $S)
+  $G.DrawLine($accentPen, $X, $Y - 10 * $S, $X, $Y + 29 * $S)
+  $coatBrush.Dispose()
+  $accentPen.Dispose()
+  $skin.Dispose()
+  $dark.Dispose()
 }
 
 function Draw-StrategyBackground([System.Drawing.Graphics]$G, [int]$W, [int]$H) {
@@ -74,6 +110,35 @@ function Draw-StrategyBackground([System.Drawing.Graphics]$G, [int]$W, [int]$H) 
     $G.FillRectangle($wall, $x, 0, 70, $H)
   }
   $wall.Dispose()
+
+  $windowBrush = BrushA 72 70 153 167
+  $windowPen = PenA 145 95 198 210 3
+  for ($i = 0; $i -lt 6; $i++) {
+    $x = $W * (0.08 + $i * 0.16)
+    $path = New-RoundedPath $x ($H * 0.08) ($W * 0.07) ($H * 0.24) 18
+    $G.FillPath($windowBrush, $path)
+    $G.DrawPath($windowPen, $path)
+    $G.DrawLine($windowPen, $x + $W * 0.035, $H * 0.09, $x + $W * 0.035, $H * 0.31)
+    $path.Dispose()
+  }
+  $windowBrush.Dispose()
+  $windowPen.Dispose()
+
+  $bannerBrush = BrushA 150 104 38 53
+  $bannerGold = PenA 160 229 178 88 5
+  for ($i = 0; $i -lt 5; $i++) {
+    $x = $W * (0.12 + $i * 0.18)
+    $G.FillPolygon($bannerBrush, [System.Drawing.PointF[]]@(
+      [System.Drawing.PointF]::new($x, $H * 0.05),
+      [System.Drawing.PointF]::new($x + $W * 0.045, $H * 0.05),
+      [System.Drawing.PointF]::new($x + $W * 0.041, $H * 0.31),
+      [System.Drawing.PointF]::new($x + $W * 0.023, $H * 0.27),
+      [System.Drawing.PointF]::new($x + $W * 0.006, $H * 0.31)
+    ))
+    $G.DrawLine($bannerGold, $x + $W * 0.01, $H * 0.12, $x + $W * 0.036, $H * 0.12)
+  }
+  $bannerBrush.Dispose()
+  $bannerGold.Dispose()
 
   $tableShadow = BrushA 160 0 0 0
   $G.FillEllipse($tableShadow, (RectF ($W * 0.08) ($H * 0.56) ($W * 0.84) ($H * 0.54)))
@@ -135,6 +200,19 @@ function Draw-StrategyBackground([System.Drawing.Graphics]$G, [int]$W, [int]$H) 
   $markerBrush.Dispose()
   $markerPen.Dispose()
 
+  $unitBrush = BrushA 235 28 65 78
+  $unitAccent = PenA 230 255 218 139 2.4
+  for ($row = 0; $row -lt 5; $row++) {
+    for ($col = 0; $col -lt 10; $col++) {
+      $ux = $W * 0.37 + $col * $W * 0.026 + ($row % 2) * $W * 0.012
+      $uy = $H * 0.47 + $row * $H * 0.043
+      $G.FillRectangle($unitBrush, (RectF $ux $uy ($W * 0.014) ($H * 0.009)))
+      if ($col % 3 -eq 0) { $G.DrawLine($unitAccent, $ux, $uy - $H * 0.012, $ux + $W * 0.014, $uy - $H * 0.012) }
+    }
+  }
+  $unitBrush.Dispose()
+  $unitAccent.Dispose()
+
   $ledgerBrush = BrushA 235 52 42 33
   $paperBrush = BrushA 220 204 176 127
   $G.FillRectangle($ledgerBrush, (RectF ($W * 0.075) ($H * 0.27) ($W * 0.18) ($H * 0.33)))
@@ -162,7 +240,19 @@ function Draw-StrategyBackground([System.Drawing.Graphics]$G, [int]$W, [int]$H) 
   $candle.Dispose()
   $flame.Dispose()
 
-  $veil = BrushA 102 2 8 12
+  $coatA = ColorA 235 29 56 68
+  $coatB = ColorA 235 70 44 36
+  $accent = ColorA 230 229 178 88
+  foreach ($fig in @(
+    @(($W * 0.18), ($H * 0.73), 2.0, $coatA),
+    @(($W * 0.29), ($H * 0.80), 1.65, $coatB),
+    @(($W * 0.76), ($H * 0.72), 1.9, $coatA),
+    @(($W * 0.85), ($H * 0.80), 1.55, $coatB)
+  )) {
+    Draw-HumanFigure $G $fig[0] $fig[1] $fig[2] $fig[3] $accent
+  }
+
+  $veil = BrushA 48 2 8 12
   $G.FillRectangle($veil, 0, 0, $W, $H)
   $veil.Dispose()
 }
@@ -186,6 +276,11 @@ function Draw-GrowthBackground([System.Drawing.Graphics]$G, [int]$W, [int]$H) {
   }
   $columnBrush.Dispose()
 
+  $lampGlow = BrushA 52 255 199 108
+  $G.FillEllipse($lampGlow, (RectF ($W * 0.05) ($H * 0.13) ($W * 0.34) ($H * 0.34)))
+  $G.FillEllipse($lampGlow, (RectF ($W * 0.63) ($H * 0.10) ($W * 0.30) ($H * 0.30)))
+  $lampGlow.Dispose()
+
   $windowPen = PenA 90 121 214 228 3
   $windowBrush = BrushA 38 49 124 148
   for ($i = 0; $i -lt 4; $i++) {
@@ -208,6 +303,18 @@ function Draw-GrowthBackground([System.Drawing.Graphics]$G, [int]$W, [int]$H) {
     $G.DrawEllipse($chalk, $W * (0.38 + $i * 0.045), $H * (0.31 + ($i % 2) * 0.025), 18, 10)
   }
   $chalk.Dispose()
+
+  $paper = BrushA 230 191 164 115
+  $paperLine = PenA 115 80 62 42 2
+  for ($i = 0; $i -lt 5; $i++) {
+    $px = $W * (0.35 + $i * 0.052)
+    $py = $H * (0.54 + ($i % 2) * 0.045)
+    $G.FillRectangle($paper, (RectF $px $py ($W * 0.042) ($H * 0.034)))
+    $G.DrawLine($paperLine, $px + 7, $py + 11, $px + $W * 0.035, $py + 11)
+    $G.DrawLine($paperLine, $px + 7, $py + 22, $px + $W * 0.029, $py + 22)
+  }
+  $paper.Dispose()
+  $paperLine.Dispose()
 
   $tableGlow = BrushA 44 71 226 190
   $G.FillEllipse($tableGlow, (RectF ($W * 0.25) ($H * 0.50) ($W * 0.50) ($H * 0.28)))
@@ -245,6 +352,19 @@ function Draw-GrowthBackground([System.Drawing.Graphics]$G, [int]$W, [int]$H) {
   $sil.Dispose()
   $gold.Dispose()
 
+  $coatBlue = ColorA 232 27 58 70
+  $coatWine = ColorA 232 81 39 55
+  $accent = ColorA 230 238 198 101
+  foreach ($fig in @(
+    @(($W * 0.20), ($H * 0.71), 1.82, $coatBlue),
+    @(($W * 0.27), ($H * 0.76), 1.55, $coatWine),
+    @(($W * 0.72), ($H * 0.70), 1.78, $coatBlue),
+    @(($W * 0.80), ($H * 0.78), 1.50, $coatWine),
+    @(($W * 0.50), ($H * 0.48), 1.28, $coatBlue)
+  )) {
+    Draw-HumanFigure $G $fig[0] $fig[1] $fig[2] $fig[3] $accent
+  }
+
   $bannerBrush = BrushA 150 75 30 44
   for ($i = 0; $i -lt 3; $i++) {
     $x = $W * (0.12 + $i * 0.33)
@@ -258,7 +378,7 @@ function Draw-GrowthBackground([System.Drawing.Graphics]$G, [int]$W, [int]$H) {
   }
   $bannerBrush.Dispose()
 
-  $veil = BrushA 110 2 8 15
+  $veil = BrushA 42 2 8 15
   $G.FillRectangle($veil, 0, 0, $W, $H)
   $veil.Dispose()
 }
@@ -282,8 +402,11 @@ function Draw-IconBase([System.Drawing.Graphics]$G, [int]$W, [int]$H, [System.Dr
 }
 
 function Draw-Icon([string]$Path, [string]$Kind, [int]$R, [int]$Gv, [int]$B, [int]$Seed) {
-  Save-Bitmap $Path 256 256 {
+  Save-Bitmap $Path 512 512 {
     param($G, $W, $H)
+    $G.ScaleTransform(2.0, 2.0)
+    $W = 256
+    $H = 256
     $accent = ColorA 255 $R $Gv $B
     Draw-IconBase $G $W $H $accent $Seed
     $main = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(240, $accent), 10)
@@ -365,8 +488,8 @@ function Draw-Icon([string]$Path, [string]$Kind, [int]$R, [int]$Gv, [int]$B, [in
   }
 }
 
-Save-Bitmap (Join-Path $OutDir "strategy-bg.png") 1600 900 ${function:Draw-StrategyBackground}
-Save-Bitmap (Join-Path $OutDir "growth-bg.png") 1600 900 ${function:Draw-GrowthBackground}
+Save-Bitmap (Join-Path $OutDir "strategy-bg.png") 2400 1350 ${function:Draw-StrategyBackground}
+Save-Bitmap (Join-Path $OutDir "growth-bg.png") 2400 1350 ${function:Draw-GrowthBackground}
 
 Draw-Icon (Join-Path $OutDir "skill-membrane-ripple.png") "skirmisher" 53 216 255 211
 Draw-Icon (Join-Path $OutDir "skill-boring-tendril.png") "engineer" 255 209 102 337
