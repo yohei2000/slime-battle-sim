@@ -15,6 +15,10 @@ import {
 } from "./vector";
 import { contactPushForce } from "./slimeCombat";
 import {
+  linkSegmentBlockedBySegments,
+  uniqueLinkSegments,
+} from "./linkGeometry";
+import {
   getMutualZocClearanceScale,
   invalidateZocBoundaryCache,
   projectOutsideEnemyZoc,
@@ -141,6 +145,18 @@ function applySpringForces(
     slime.nodes.map((node) => [node.id, localEnemyPressure(slime, enemy, node)]),
   );
   const seen = new Set<string>();
+  const linkBlockingDistance =
+    slime.currentWidth * 0.42 +
+    slime.currentDepth * 0.22 +
+    enemy.currentWidth * 0.42 +
+    enemy.currentDepth * 0.22 +
+    70;
+  const enemyLinkSegments =
+    slime.isEngaged ||
+    enemy.isEngaged ||
+    distance(slime.center, enemy.center) < linkBlockingDistance
+      ? uniqueLinkSegments(enemy)
+      : [];
   let totalIntegrity = 0;
   let linkCount = 0;
   let brokenCount = 0;
@@ -170,6 +186,25 @@ function applySpringForces(
       const a = byId.get(link.nodeAId);
       const b = byId.get(link.nodeBId);
       if (!a || !b) continue;
+      const blockedByEnemyLink =
+        enemyLinkSegments.length > 0 &&
+        linkSegmentBlockedBySegments(
+          { link, nodeA: a, nodeB: b },
+          enemyLinkSegments,
+          7,
+        );
+      if (blockedByEnemyLink) {
+        link.localPressure = Math.max(link.localPressure, 0.95);
+        link.stress = Math.max(link.stress, slime.effectiveToughness * 1.08);
+        link.recoveryDelay = Math.max(link.recoveryDelay, 0.9);
+        link.integrity = Math.max(
+          0.16,
+          link.integrity - (0.42 + enemy.pressure / 180) * dt,
+        );
+        peakLocalStress = Math.max(peakLocalStress, link.stress);
+        totalIntegrity += link.integrity;
+        continue;
+      }
       const delta = sub(b.position, a.position);
       const currentLength = Math.max(0.001, length(delta));
       const structuralStrain = currentLength / Math.max(0.001, link.restLength);

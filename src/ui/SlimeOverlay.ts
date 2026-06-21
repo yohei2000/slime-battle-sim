@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import type { ArmySlime, SlimeNode, Vector2Like } from "../sim/types";
 import { getBoundaryNodes } from "../sim/slime";
+import { linkSegmentBlockedByEnemies } from "../sim/linkGeometry";
 import {
   shortNodeName,
   stressCause,
@@ -167,7 +168,7 @@ export class SlimeOverlay {
       drawPolygon(this.bodyGraphics, points);
     }
     this.drawNodeDensity(slime, color.fill);
-    this.drawStressNetwork(slime, time);
+    this.drawStressNetwork(slime, time, enemies);
 
     for (const particle of slime.particles) {
       if (!particle.alive) continue;
@@ -488,13 +489,22 @@ export class SlimeOverlay {
     return 0x47d7c8;
   }
 
-  private drawStressNetwork(slime: ArmySlime, time: number): void {
+  private drawStressNetwork(
+    slime: ArmySlime,
+    time: number,
+    enemies: ArmySlime[],
+  ): void {
     const infos = stressLinks(slime);
     const visible = infos.filter(
       (info) =>
         info.nodeA &&
         info.nodeB &&
         !info.link.broken &&
+        !linkSegmentBlockedByEnemies(
+          { link: info.link, nodeA: info.nodeA, nodeB: info.nodeB },
+          enemies,
+          7,
+        ) &&
         (this.stressDetail || slime.isSelected || info.loadRatio >= 0.7),
     );
 
@@ -536,6 +546,15 @@ export class SlimeOverlay {
 
     for (const info of infos.filter((candidate) => candidate.link.broken)) {
       if (!info.nodeA || !info.nodeB) continue;
+      if (
+        linkSegmentBlockedByEnemies(
+          { link: info.link, nodeA: info.nodeA, nodeB: info.nodeB },
+          enemies,
+          7,
+        )
+      ) {
+        continue;
+      }
       const midpoint = lerp(info.nodeA.position, info.nodeB.position, 0.5);
       const aEnd = lerp(info.nodeA.position, midpoint, 0.72);
       const bEnd = lerp(info.nodeB.position, midpoint, 0.72);
