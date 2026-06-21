@@ -6,10 +6,11 @@ import {
   choiceKindLabel,
   createInitialGrowthState,
   rerollChoices,
+  SKILL_DEFINITIONS,
   skillDefinition,
   slotLabel,
 } from "../growth/slimeSkills";
-import type { SkillChoice, SkillSlotState, SlimeGrowthState } from "../growth/slimeSkills";
+import type { SkillChoice, SkillSlotState, SlimeGrowthState, SlimeSkillId } from "../growth/slimeSkills";
 
 type Rect = {
   x: number;
@@ -22,6 +23,8 @@ type TextButton = {
   background: Phaser.GameObjects.Rectangle;
   label: Phaser.GameObjects.Text;
 };
+
+const GROWTH_BACKGROUND_KEY = "growth-generated-background";
 
 export class SlimeGrowthScene extends Phaser.Scene {
   private growth: SlimeGrowthState = createInitialGrowthState();
@@ -42,6 +45,13 @@ export class SlimeGrowthScene extends Phaser.Scene {
 
   constructor() {
     super("SlimeGrowthScene");
+  }
+
+  preload(): void {
+    this.load.image(GROWTH_BACKGROUND_KEY, "assets/generated/growth-bg.png");
+    SKILL_DEFINITIONS.forEach((definition) => {
+      this.load.image(definition.artKey, `assets/generated/${definition.artKey}.png`);
+    });
   }
 
   create(): void {
@@ -144,8 +154,9 @@ export class SlimeGrowthScene extends Phaser.Scene {
   }
 
   private addBackground(width: number, height: number): void {
+    this.addCoverImage(GROWTH_BACKGROUND_KEY, width, height, 0.95, -4);
     const graphics = this.add.graphics();
-    graphics.fillStyle(0x071118, 1);
+    graphics.fillStyle(0x071118, 0.44);
     graphics.fillRect(0, 0, width, height);
     graphics.lineStyle(1, 0x163342, 0.26);
     for (let x = 0; x <= width; x += 64) graphics.lineBetween(x, 0, x, height);
@@ -319,8 +330,19 @@ export class SlimeGrowthScene extends Phaser.Scene {
         .setOrigin(0)
         .setStrokeStyle(slot.evolved ? 2 : 1, slot.evolved ? 0xffd166 : color, slot.skillId ? 0.82 : 0.42)
         .setDepth(3);
+      if (slot.skillId) {
+        this.addSkillImage(slot.skillId, px + 12, py + pillHeight / 2, 17, 0.86, 4);
+      }
       const label = slot.skillId ? `${slotLabel(slot)} Lv.${slot.level}` : "空き";
-      this.addText(px + 6, py + 5, label, 8, definition?.accent ?? "#7f98a5", slot.skillId ? 700 : 500, pillWidth - 12).setDepth(4);
+      this.addText(
+        px + (slot.skillId ? 25 : 6),
+        py + 5,
+        label,
+        8,
+        definition?.accent ?? "#7f98a5",
+        slot.skillId ? 700 : 500,
+        pillWidth - (slot.skillId ? 31 : 12),
+      ).setDepth(4);
       this.objects.push(pill);
     });
   }
@@ -398,6 +420,9 @@ export class SlimeGrowthScene extends Phaser.Scene {
         .circle(x, y, slotRadius, color, slot.skillId ? 0.82 : 0.22)
         .setStrokeStyle(2, 0xeafaff, slot.skillId ? 0.4 : 0.16)
         .setDepth(4);
+      if (slot.skillId) {
+        this.addSkillImage(slot.skillId, x, y, slotRadius * 1.42, 0.78, 4.6);
+      }
       const glow = this.add
         .circle(x, y, slotRadius + 12, color, slot.skillId ? 0.16 : 0.04)
         .setBlendMode(Phaser.BlendModes.ADD)
@@ -560,6 +585,8 @@ export class SlimeGrowthScene extends Phaser.Scene {
     compact: boolean,
   ): void {
     const definition = skillDefinition(choice.skillId);
+    const artSize = compact ? Math.min(52, height - 12) : Math.min(88, height - 30);
+    const textWidth = Math.max(96, width - artSize - (compact ? 42 : 56));
     const background = this.add
       .rectangle(x, y, width, height, 0x102632, 0.96)
       .setOrigin(0)
@@ -578,6 +605,14 @@ export class SlimeGrowthScene extends Phaser.Scene {
       .rectangle(x + width - 28, y + 16, compact ? 18 : 22, compact ? 12 : 14, definition.color, 0.52)
       .setBlendMode(Phaser.BlendModes.ADD)
       .setDepth(6);
+    this.addSkillImage(
+      choice.skillId,
+      x + width - artSize / 2 - (compact ? 12 : 18),
+      y + height / 2,
+      artSize,
+      compact ? 0.82 : 0.9,
+      5.4,
+    );
     this.tweens.add({
       targets: glow,
       alpha: choice.kind === "evolve" ? 0.34 : 0.16,
@@ -606,18 +641,18 @@ export class SlimeGrowthScene extends Phaser.Scene {
     });
 
     const dense = compact && height < 96;
-    this.addText(x + 14, y + 8, `${choiceKindLabel(choice)} / ${definition.organ}`, compact ? 8 : 10, definition.accent, 700, width - 44).setDepth(6);
-    this.addText(x + 14, y + (compact ? 21 : 25), definition.name, dense ? 11 : compact ? 13 : 15, "#eafaff", 700, width - 44).setDepth(6);
+    this.addText(x + 14, y + 8, `${choiceKindLabel(choice)} / ${definition.organ}`, compact ? 8 : 10, definition.accent, 700, textWidth).setDepth(6);
+    this.addText(x + 14, y + (compact ? 21 : 25), definition.name, dense ? 11 : compact ? 13 : 15, "#eafaff", 700, textWidth).setDepth(6);
 
     const lineStart = y + (compact ? (dense ? 39 : 42) : 48);
     const lineGap = compact ? (dense ? 12 : 13) : 16;
-    this.addChoiceLine(x + 14, lineStart, "国家", definition.stateText, width - 28, compact, definition.accent);
+    this.addChoiceLine(x + 14, lineStart, "国家", definition.stateText, textWidth, compact, definition.accent);
     if (dense) {
-      this.addChoiceLine(x + 14, lineStart + lineGap, "戦場", definition.behaviorText, width - 28, compact, definition.accent);
+      this.addChoiceLine(x + 14, lineStart + lineGap, "戦場", definition.behaviorText, textWidth, compact, definition.accent);
     } else {
-      this.addChoiceLine(x + 14, lineStart + lineGap, "運用", definition.operationText, width - 28, compact, definition.accent);
-      this.addChoiceLine(x + 14, lineStart + lineGap * 2, "戦場", definition.behaviorText, width - 28, compact, definition.accent);
-      this.addChoiceLine(x + 14, lineStart + lineGap * 3, "弱点", definition.weaknessText, width - 28, compact, "#ffb3c4");
+      this.addChoiceLine(x + 14, lineStart + lineGap, "運用", definition.operationText, textWidth, compact, definition.accent);
+      this.addChoiceLine(x + 14, lineStart + lineGap * 2, "戦場", definition.behaviorText, textWidth, compact, definition.accent);
+      this.addChoiceLine(x + 14, lineStart + lineGap * 3, "弱点", definition.weaknessText, textWidth, compact, "#ffb3c4");
     }
     this.objects.push(glow, background, stripe, insignia);
   }
@@ -702,6 +737,45 @@ export class SlimeGrowthScene extends Phaser.Scene {
     });
     this.objects.push(object);
     return object;
+  }
+
+  private addCoverImage(
+    textureKey: string,
+    width: number,
+    height: number,
+    alpha: number,
+    depth: number,
+  ): void {
+    if (!this.textures.exists(textureKey)) return;
+    const texture = this.textures.get(textureKey);
+    const source = texture.getSourceImage() as HTMLImageElement | HTMLCanvasElement;
+    const sourceWidth = source.width || width;
+    const sourceHeight = source.height || height;
+    const scale = Math.max(width / sourceWidth, height / sourceHeight);
+    const image = this.add
+      .image(width / 2, height / 2, textureKey)
+      .setDisplaySize(sourceWidth * scale, sourceHeight * scale)
+      .setAlpha(alpha)
+      .setDepth(depth);
+    this.objects.push(image);
+  }
+
+  private addSkillImage(
+    skillId: SlimeSkillId,
+    x: number,
+    y: number,
+    size: number,
+    alpha: number,
+    depth: number,
+  ): void {
+    const definition = skillDefinition(skillId);
+    if (!this.textures.exists(definition.artKey)) return;
+    const image = this.add
+      .image(x, y, definition.artKey)
+      .setDisplaySize(size, size)
+      .setAlpha(alpha)
+      .setDepth(depth);
+    this.objects.push(image);
   }
 
   private clearObjects(): void {

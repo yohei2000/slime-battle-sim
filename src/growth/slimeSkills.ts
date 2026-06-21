@@ -32,6 +32,7 @@ export type SlimeSkillDefinition = {
   name: string;
   shortName: string;
   organ: string;
+  artKey: string;
   color: number;
   accent: string;
   maxLevel: number;
@@ -79,6 +80,7 @@ export const SKILL_DEFINITIONS: SlimeSkillDefinition[] = [
     name: "散兵展開教範",
     shortName: "散兵",
     organ: "歩兵教練",
+    artKey: "skill-membrane-ripple",
     color: 0x35d8ff,
     accent: "#7cecff",
     maxLevel: 5,
@@ -97,6 +99,7 @@ export const SKILL_DEFINITIONS: SlimeSkillDefinition[] = [
     name: "突撃工兵隊",
     shortName: "工兵",
     organ: "工兵学校",
+    artKey: "skill-boring-tendril",
     color: 0xffd166,
     accent: "#ffd166",
     maxLevel: 5,
@@ -115,6 +118,7 @@ export const SKILL_DEFINITIONS: SlimeSkillDefinition[] = [
     name: "兵站補充制",
     shortName: "補充",
     organ: "兵站局",
+    artKey: "skill-spore-core",
     color: 0x63d471,
     accent: "#9aff9f",
     maxLevel: 5,
@@ -133,6 +137,7 @@ export const SKILL_DEFINITIONS: SlimeSkillDefinition[] = [
     name: "参謀伝令網",
     shortName: "伝令",
     organ: "参謀本部",
+    artKey: "skill-nerve-gel",
     color: 0x9c8dff,
     accent: "#c5bdff",
     maxLevel: 5,
@@ -151,6 +156,7 @@ export const SKILL_DEFINITIONS: SlimeSkillDefinition[] = [
     name: "隊列規律",
     shortName: "隊列",
     organ: "軍紀",
+    artKey: "skill-shell-grains",
     color: 0xf4b45f,
     accent: "#ffd18a",
     maxLevel: 5,
@@ -169,6 +175,7 @@ export const SKILL_DEFINITIONS: SlimeSkillDefinition[] = [
     name: "野戦救護班",
     shortName: "救護",
     organ: "衛生隊",
+    artKey: "skill-absorption-vacuole",
     color: 0xff91aa,
     accent: "#ff91aa",
     maxLevel: 5,
@@ -187,6 +194,7 @@ export const SKILL_DEFINITIONS: SlimeSkillDefinition[] = [
     name: "戦線管制班",
     shortName: "管制",
     organ: "戦線司令",
+    artKey: "skill-zoc-ring",
     color: 0x2bd6a3,
     accent: "#6fffd0",
     maxLevel: 5,

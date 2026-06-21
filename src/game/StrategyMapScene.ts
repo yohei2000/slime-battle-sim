@@ -48,6 +48,8 @@ const DIPLOMACY_ACTIONS: Array<{ id: DiplomacyActionId; label: string }> = [
   { id: "pressure", label: "威圧" },
 ];
 
+const STRATEGY_BACKGROUND_KEY = "strategy-generated-background";
+
 export class StrategyMapScene extends Phaser.Scene {
   private state: CampaignState = createInitialCampaignState();
   private objects: Phaser.GameObjects.GameObject[] = [];
@@ -56,6 +58,10 @@ export class StrategyMapScene extends Phaser.Scene {
 
   constructor() {
     super("StrategyMapScene");
+  }
+
+  preload(): void {
+    this.load.image(STRATEGY_BACKGROUND_KEY, "assets/generated/strategy-bg.png");
   }
 
   create(): void {
@@ -111,8 +117,9 @@ export class StrategyMapScene extends Phaser.Scene {
   }
 
   private addBackground(width: number, height: number): void {
+    this.addCoverImage(STRATEGY_BACKGROUND_KEY, width, height, 0.92, -4);
     const graphics = this.add.graphics();
-    graphics.fillStyle(0x071118, 1);
+    graphics.fillStyle(0x071118, 0.48);
     graphics.fillRect(0, 0, width, height);
     graphics.lineStyle(1, 0x163342, 0.25);
     for (let x = 0; x <= width; x += 72) graphics.lineBetween(x, 0, x, height);
@@ -171,7 +178,7 @@ export class StrategyMapScene extends Phaser.Scene {
         this.mapRect.width,
         this.mapRect.height,
         0x0a1a23,
-        0.94,
+        0.9,
       )
       .setOrigin(0)
       .setStrokeStyle(2, 0x2b5363, 0.8);
@@ -258,7 +265,7 @@ export class StrategyMapScene extends Phaser.Scene {
         this.panelRect.width,
         this.panelRect.height,
         0x0b1a23,
-        0.96,
+        0.92,
       )
       .setOrigin(0)
       .setStrokeStyle(2, 0x2b5363, 0.74);
@@ -520,6 +527,27 @@ export class StrategyMapScene extends Phaser.Scene {
     });
     this.objects.push(object);
     return object;
+  }
+
+  private addCoverImage(
+    textureKey: string,
+    width: number,
+    height: number,
+    alpha: number,
+    depth: number,
+  ): void {
+    if (!this.textures.exists(textureKey)) return;
+    const texture = this.textures.get(textureKey);
+    const source = texture.getSourceImage() as HTMLImageElement | HTMLCanvasElement;
+    const sourceWidth = source.width || width;
+    const sourceHeight = source.height || height;
+    const scale = Math.max(width / sourceWidth, height / sourceHeight);
+    const image = this.add
+      .image(width / 2, height / 2, textureKey)
+      .setDisplaySize(sourceWidth * scale, sourceHeight * scale)
+      .setAlpha(alpha)
+      .setDepth(depth);
+    this.objects.push(image);
   }
 
   private clearObjects(): void {
