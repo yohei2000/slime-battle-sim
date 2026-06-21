@@ -17,6 +17,13 @@ export function calculateCommandDelay(slime: ArmySlime, order: Omit<SlimeOrder, 
       )) *
       0.8;
 
+  const sideDelay =
+    slime.side === "enemy"
+      ? 0.38
+      : slime.side === "player"
+        ? -0.08
+        : 0;
+
   return clamp(
     0.22 +
       slime.fatigue * 0.005 +
@@ -24,7 +31,8 @@ export function calculateCommandDelay(slime: ArmySlime, order: Omit<SlimeOrder, 
       (slime.isEngaged ? 0.32 : 0) +
       (100 - slime.cohesion) * 0.007 +
       shapeChange * 0.85 +
-      slime.crowding * 0.9,
+      slime.crowding * 0.9 +
+      sideDelay,
     0.18,
     2.8,
   );

@@ -5,10 +5,10 @@ import { add, clamp, normalize, perpendicular, scale, sub } from "./vector";
 
 function targetShape(enemy: ArmySlime, posture: SlimePosture) {
   if (posture === "breakthrough" || posture === "contract") {
-    return { width: 172, depth: 235, density: 1.35 };
+    return { width: 188, depth: 220, density: 1.2 };
   }
   if (posture === "spread" || posture === "envelop") {
-    return { width: 440, depth: 132, density: 0.72 };
+    return { width: 390, depth: 145, density: 0.78 };
   }
   return { width: 250, depth: 180, density: 1 };
 }
@@ -16,13 +16,13 @@ function targetShape(enemy: ArmySlime, posture: SlimePosture) {
 function weakPoint(player: ArmySlime, enemy: ArmySlime): Vector2Like {
   const lateral = perpendicular(player.facing);
   const side = Math.sin(enemy.center.y * 0.017) > 0 ? 1 : -1;
-  return add(player.center, scale(lateral, player.currentWidth * 0.14 * side));
+  return add(player.center, scale(lateral, player.currentWidth * 0.09 * side));
 }
 
 export function updateEnemyAI(enemy: ArmySlime, player: ArmySlime, now: number): void {
   if (enemy.isRouting) return;
   if (now < enemy.aiThinkAt || enemy.activeOrder?.status === "transmitting") return;
-  enemy.aiThinkAt = now + 1.2 + Math.random() * 0.7;
+  enemy.aiThinkAt = now + 2.1 + Math.random() * 1.25;
 
   const access = flankAccess(enemy, player);
   let posture: SlimePosture = "neutral";
@@ -34,19 +34,19 @@ export function updateEnemyAI(enemy: ArmySlime, player: ArmySlime, now: number):
   } else if (enemy.isEncircled) {
     posture = "breakthrough";
     target = weakPoint(player, enemy);
-  } else if (player.gapRisk > 0.64 && player.envelopPower < 0.58) {
+  } else if (player.gapRisk > 0.76 && player.envelopPower < 0.5) {
     posture = "breakthrough";
     target = weakPoint(player, enemy);
-  } else if (player.currentDensity > 1.12 && access > 0.12) {
+  } else if (player.currentDensity > 1.28 && access > 0.22) {
     posture = "envelop";
-  } else if (enemy.morale > player.morale + 6 && player.morale < 56) {
+  } else if (enemy.morale > player.morale + 14 && player.morale < 44) {
     posture = "envelop";
-  } else if (enemy.fatigue > 68) {
+  } else if (enemy.fatigue > 58) {
     posture = "hold";
     target = enemy.center;
   } else {
     posture =
-      access > 0.08 || player.currentDensity > 1.02 || Math.random() > 0.34
+      access > 0.2 || player.currentDensity > 1.22 || Math.random() > 0.72
         ? "envelop"
         : "breakthrough";
     if (posture === "breakthrough") target = weakPoint(player, enemy);
@@ -63,11 +63,11 @@ export function updateEnemyAI(enemy: ArmySlime, player: ArmySlime, now: number):
       : posture === "hold"
         ? 0
         : posture === "envelop"
-          ? 86
-          : 118;
+          ? 64
+          : 92;
   const wingAdvance =
     posture === "envelop"
-      ? clamp(player.currentWidth * 0.28 + enemy.currentWidth * 0.12, 75, 165)
+      ? clamp(player.currentWidth * 0.2 + enemy.currentWidth * 0.08, 42, 118)
       : 0;
   issueOrder(enemy, {
     posture,

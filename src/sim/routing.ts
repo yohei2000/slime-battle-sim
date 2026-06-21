@@ -11,10 +11,16 @@ export function updateRoutingState(
   enemy: ArmySlime,
   now: number,
 ): void {
+  const moraleThreshold =
+    slime.side === "enemy" ? ROUT_MORALE_THRESHOLD + 6 : ROUT_MORALE_THRESHOLD - 3;
+  const cohesionThreshold =
+    slime.side === "enemy" ? ROUT_COHESION_THRESHOLD + 4 : ROUT_COHESION_THRESHOLD;
+  const rallyThreshold =
+    slime.side === "enemy" ? RALLY_MORALE_THRESHOLD + 6 : RALLY_MORALE_THRESHOLD - 3;
   if (
     !slime.isRouting &&
-    (slime.morale <= ROUT_MORALE_THRESHOLD ||
-      slime.cohesion <= ROUT_COHESION_THRESHOLD)
+    (slime.morale <= moraleThreshold ||
+      slime.cohesion <= cohesionThreshold)
   ) {
     slime.isRouting = true;
     slime.routedAt = now;
@@ -24,7 +30,7 @@ export function updateRoutingState(
 
   if (
     slime.isRouting &&
-    slime.morale >= RALLY_MORALE_THRESHOLD &&
+    slime.morale >= rallyThreshold &&
     !slime.isEngaged &&
     now - slime.routedAt >= MIN_ROUT_SECONDS
   ) {

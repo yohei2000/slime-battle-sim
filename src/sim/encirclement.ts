@@ -44,9 +44,10 @@ export function updateEncirclement(attacker: ArmySlime, defender: ArmySlime, dt:
   );
   const wrapAccess = Math.max(access, widthCoverage * 0.62);
   const wrapMotion = 0.72 + wingAdvance * 0.42 + contactGrip * 0.22;
+  const attackerBalance = attacker.side === "player" ? 1.18 : 0.72;
   const gain =
     range < reach + 165
-      ? postureBonus * wrapAccess * integrity * wrapMotion * 0.27
+      ? postureBonus * wrapAccess * integrity * wrapMotion * 0.27 * attackerBalance
       : 0;
   defender.encirclement = clamp01(
     defender.encirclement + gain * dt - (gain === 0 ? 0.032 * dt : 0),
@@ -56,18 +57,31 @@ export function updateEncirclement(attacker: ArmySlime, defender: ArmySlime, dt:
 
   if (defender.encirclement > 0.22) {
     const pressure = defender.encirclement;
+    const defenderVulnerability = defender.side === "enemy" ? 1.18 : 0.78;
     defender.morale = clamp(
-      defender.morale - pressure * (defender.isEncircled ? 2.8 : 1.85) * dt,
+      defender.morale -
+        pressure *
+          (defender.isEncircled ? 2.8 : 1.85) *
+          defenderVulnerability *
+          dt,
       0,
       100,
     );
     defender.fatigue = clamp(
-      defender.fatigue + pressure * (defender.isEncircled ? 2.25 : 1.35) * dt,
+      defender.fatigue +
+        pressure *
+          (defender.isEncircled ? 2.25 : 1.35) *
+          defenderVulnerability *
+          dt,
       0,
       100,
     );
     defender.pressure = clamp(
-      defender.pressure + pressure * (defender.isEncircled ? 3.2 : 1.6) * dt,
+      defender.pressure +
+        pressure *
+          (defender.isEncircled ? 3.2 : 1.6) *
+          defenderVulnerability *
+          dt,
       0,
       100,
     );
@@ -78,7 +92,8 @@ export function updateEncirclement(attacker: ArmySlime, defender: ArmySlime, dt:
     );
     if (defender.encirclement > 0.48) {
       defender.cohesion = clamp(
-        defender.cohesion - (defender.encirclement - 0.38) * 2.1 * dt,
+        defender.cohesion -
+          (defender.encirclement - 0.38) * 2.1 * defenderVulnerability * dt,
         0,
         100,
       );
