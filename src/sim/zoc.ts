@@ -12,8 +12,18 @@ export type ZocBoundarySample = {
   penetration: number;
 };
 
-function boundary(slime: ArmySlime): SlimeNode[] {
-  const nodes = slime.nodes.filter((node) => node.role !== "interior");
+type BoundaryCacheEntry = {
+  bodyPoints: Vector2Like[];
+  zocPointsByScale: Map<number, Vector2Like[]>;
+};
+
+const boundaryCache = new WeakMap<ArmySlime, BoundaryCacheEntry>();
+
+function boundaryNodes(slime: ArmySlime): SlimeNode[] {
+  return slime.nodes.filter((node) => node.role !== "interior");
+}
+
+function sortedBoundary(slime: ArmySlime, nodes: SlimeNode[]): SlimeNode[] {
   if (nodes.length < 3) return nodes;
   const center = average(nodes.map((node) => node.position));
   return [...nodes].sort(
@@ -21,6 +31,26 @@ function boundary(slime: ArmySlime): SlimeNode[] {
       Math.atan2(a.position.y - center.y, a.position.x - center.x) -
       Math.atan2(b.position.y - center.y, b.position.x - center.x),
   );
+}
+
+function cachedBoundary(slime: ArmySlime): BoundaryCacheEntry {
+  const cached = boundaryCache.get(slime);
+  if (cached) return cached;
+
+  const nodes = boundaryNodes(slime);
+  const bodyPoints = sortedBoundary(slime, nodes).map((node) => ({
+    ...node.position,
+  }));
+  const entry: BoundaryCacheEntry = {
+    bodyPoints,
+    zocPointsByScale: new Map(),
+  };
+  boundaryCache.set(slime, entry);
+  return entry;
+}
+
+export function invalidateZocBoundaryCache(slime: ArmySlime): void {
+  boundaryCache.delete(slime);
 }
 
 function closestPointOnSegment(
@@ -77,14 +107,19 @@ function segmentOutwardNormal(
 }
 
 export function getBodyBoundaryPoints(slime: ArmySlime): Vector2Like[] {
-  return boundary(slime).map((node) => ({ ...node.position }));
+  return cachedBoundary(slime).bodyPoints.map((point) => ({ ...point }));
 }
 
 export function getZocBoundaryPoints(
   slime: ArmySlime,
   clearanceScale = 1,
 ): Vector2Like[] {
-  const body = getBodyBoundaryPoints(slime);
+  const cache = cachedBoundary(slime);
+  const cacheKey = Math.round(clearanceScale * 1000) / 1000;
+  const cached = cache.zocPointsByScale.get(cacheKey);
+  if (cached) return cached.map((point) => ({ ...point }));
+
+  const body = cache.bodyPoints;
   if (body.length < 3) return body;
   const clearance = slime.zocRadius * clearanceScale;
   const expanded = body.map((point, index) => {
@@ -99,7 +134,9 @@ export function getZocBoundaryPoints(
         : normalize(sub(point, slime.center));
     return add(point, scale(safeNormal, clearance));
   });
-  return smoothClosed(expanded);
+  const zocPoints = smoothClosed(expanded);
+  cache.zocPointsByScale.set(cacheKey, zocPoints);
+  return zocPoints.map((point) => ({ ...point }));
 }
 
 function closestPolygonSample(
@@ -133,8 +170,13 @@ export function sampleEnemyZoc(
   point: Vector2Like,
   clearanceScale = 1,
 ): ZocBoundarySample {
-  const bodyPoints = getBodyBoundaryPoints(enemy);
-  const zocPoints = getZocBoundaryPoints(enemy, clearanceScale);
+  const cache = cachedBoundary(enemy);
+  const cacheKey = Math.round(clearanceScale * 1000) / 1000;
+  let zocPoints = cache.zocPointsByScale.get(cacheKey);
+  if (!zocPoints) {
+    zocPoints = getZocBoundaryPoints(enemy, clearanceScale);
+  }
+  const bodyPoints = cache.bodyPoints;
   const bodySample = closestPolygonSample(bodyPoints, enemy.center, point);
   const zocSample = closestPolygonSample(zocPoints, enemy.center, point);
   const insideBody = pointInsidePolygon(bodyPoints, point);

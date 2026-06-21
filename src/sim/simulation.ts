@@ -29,36 +29,49 @@ export class BattleSimulation {
   }
 
   update(rawDt: number): void {
-    if (this.state.paused || this.state.winner) return;
-    const dt = Math.min(rawDt, 0.033) * this.state.speed;
+    if (this.state.paused) return;
+    const isResolved = Boolean(this.state.winner);
+    if (
+      isResolved &&
+      this.state.winnerAt !== undefined &&
+      this.state.elapsed - this.state.winnerAt > 6
+    ) {
+      return;
+    }
+    const dt =
+      Math.min(rawDt, 0.033) *
+      this.state.speed *
+      (isResolved ? 0.32 : 1);
     this.state.elapsed += dt;
     const players = this.state.playerSlimes;
     const enemies = this.state.enemySlimes;
 
-    for (const player of players) {
-      const enemy = this.nearest(player, enemies);
-      if (enemy) updateRoutingState(player, enemy, this.state.elapsed);
-    }
-    for (const enemy of enemies) {
-      const player = this.nearest(enemy, players);
-      if (player) updateRoutingState(enemy, player, this.state.elapsed);
-    }
+    if (!isResolved) {
+      for (const player of players) {
+        const enemy = this.nearest(player, enemies);
+        if (enemy) updateRoutingState(player, enemy, this.state.elapsed);
+      }
+      for (const enemy of enemies) {
+        const player = this.nearest(enemy, players);
+        if (player) updateRoutingState(enemy, player, this.state.elapsed);
+      }
 
-    for (const slime of [...players, ...enemies]) {
-      updateOrder(slime, this.state.elapsed);
-    }
-    for (const enemy of enemies) {
-      const target = this.nearest(enemy, players);
-      if (target) updateEnemyAI(enemy, target, this.state.elapsed);
-    }
+      for (const slime of [...players, ...enemies]) {
+        updateOrder(slime, this.state.elapsed);
+      }
+      for (const enemy of enemies) {
+        const target = this.nearest(enemy, players);
+        if (target) updateEnemyAI(enemy, target, this.state.elapsed);
+      }
 
-    for (const player of players) {
-      const enemy = this.nearest(player, enemies);
-      if (enemy) resolveCombat(player, enemy, dt);
-    }
-    for (const enemy of enemies) {
-      const player = this.nearest(enemy, players);
-      if (player) resolveCombat(enemy, player, dt);
+      for (const player of players) {
+        const enemy = this.nearest(player, enemies);
+        if (enemy) resolveCombat(player, enemy, dt);
+      }
+      for (const enemy of enemies) {
+        const player = this.nearest(enemy, players);
+        if (player) resolveCombat(enemy, player, dt);
+      }
     }
 
     for (const player of players) {
@@ -70,36 +83,31 @@ export class BattleSimulation {
       if (player) updateSlime(enemy, player, dt, this.bounds);
     }
 
-    for (const player of players) {
-      const enemy = this.nearest(player, enemies);
-      if (enemy) updateEncirclement(player, enemy, dt);
-    }
-    for (const enemy of enemies) {
-      const player = this.nearest(enemy, players);
-      if (player) updateEncirclement(enemy, player, dt);
-    }
+    if (!isResolved) {
+      for (const player of players) {
+        const enemy = this.nearest(player, enemies);
+        if (enemy) updateEncirclement(player, enemy, dt);
+      }
+      for (const enemy of enemies) {
+        const player = this.nearest(enemy, players);
+        if (player) updateEncirclement(enemy, player, dt);
+      }
 
-    this.state.playerSlimes = this.processSplits(players, dt);
-    this.state.enemySlimes = this.processSplits(enemies, dt);
+      this.state.playerSlimes = this.processSplits(players, dt);
+      this.state.enemySlimes = this.processSplits(enemies, dt);
+    }
     this.state.player =
       this.state.playerSlimes.find((slime) => slime.isSelected) ??
       this.state.playerSlimes[0];
     this.state.enemy = this.nearest(this.state.player, this.state.enemySlimes) ?? this.state.enemySlimes[0];
 
-    const playerAlive = this.state.playerSlimes.some(
-      (slime) =>
-        slime.morale > 3 &&
-        slime.cohesion > 2 &&
-        (!slime.isRouting || this.state.elapsed - slime.routedAt < 5),
-    );
-    const enemyAlive = this.state.enemySlimes.some(
-      (slime) =>
-        slime.morale > 3 &&
-        slime.cohesion > 2 &&
-        (!slime.isRouting || this.state.elapsed - slime.routedAt < 5),
-    );
-    if (!playerAlive) this.state.winner = "enemy";
-    if (!enemyAlive) this.state.winner = "player";
+    if (!isResolved) {
+      const playerAlive = this.sideCanStillFight(this.state.playerSlimes);
+      const enemyAlive = this.sideCanStillFight(this.state.enemySlimes);
+      if (!playerAlive && !enemyAlive) this.finishBattle("draw");
+      else if (!playerAlive) this.finishBattle("enemy");
+      else if (!enemyAlive) this.finishBattle("player");
+    }
   }
 
   cycleSpeed(): void {
@@ -127,5 +135,19 @@ export class BattleSimulation {
       }
     }
     return result;
+  }
+
+  private sideCanStillFight(slimes: ArmySlime[]): boolean {
+    return slimes.some((slime) => {
+      const routedTooLong =
+        slime.isRouting && this.state.elapsed - slime.routedAt >= 8;
+      return slime.morale > 3 && !routedTooLong;
+    });
+  }
+
+  private finishBattle(winner: BattleState["winner"]): void {
+    if (this.state.winner) return;
+    this.state.winner = winner;
+    this.state.winnerAt = this.state.elapsed;
   }
 }

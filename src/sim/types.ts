@@ -177,4 +177,5 @@ export type BattleState = {
   speed: number;
   paused: boolean;
   winner?: Side | "draw";
+  winnerAt?: number;
 };

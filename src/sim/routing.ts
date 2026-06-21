@@ -3,6 +3,7 @@ import { add, clamp, normalize, scale, sub } from "./vector";
 
 export const ROUT_MORALE_THRESHOLD = 25;
 export const RALLY_MORALE_THRESHOLD = 38;
+const ROUT_COHESION_THRESHOLD = 4;
 const MIN_ROUT_SECONDS = 8;
 
 export function updateRoutingState(
@@ -10,7 +11,11 @@ export function updateRoutingState(
   enemy: ArmySlime,
   now: number,
 ): void {
-  if (!slime.isRouting && slime.morale <= ROUT_MORALE_THRESHOLD) {
+  if (
+    !slime.isRouting &&
+    (slime.morale <= ROUT_MORALE_THRESHOLD ||
+      slime.cohesion <= ROUT_COHESION_THRESHOLD)
+  ) {
     slime.isRouting = true;
     slime.routedAt = now;
     slime.activeOrder = undefined;

@@ -14,7 +14,12 @@ import {
   sub,
 } from "./vector";
 import { contactPushForce } from "./slimeCombat";
-import { projectOutsideEnemyZoc, sampleEnemyZoc, updateZocStats } from "./zoc";
+import {
+  invalidateZocBoundaryCache,
+  projectOutsideEnemyZoc,
+  sampleEnemyZoc,
+  updateZocStats,
+} from "./zoc";
 
 type ForceMap = Map<string, Vector2Like>;
 
@@ -473,4 +478,5 @@ export function updateSlime(
   integrateNodes(slime, enemy, forces, dt, bounds);
   updateParticles(slime, dt);
   updateDerivedStats(slime, dt);
+  invalidateZocBoundaryCache(slime);
 }

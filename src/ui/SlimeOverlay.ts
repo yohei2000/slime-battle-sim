@@ -429,11 +429,18 @@ export class SlimeOverlay {
   }
 
   private drawWarnings(slime: ArmySlime, nodes: SlimeNode[], time: number): void {
-    if (slime.gapRisk > 0.38 && Math.sin(time * 0.009) > -0.2) {
-      this.effectGraphics.lineStyle(5, 0xffd166, 0.85);
+    if (slime.gapRisk > 0.55 && Math.sin(time * 0.006) > -0.35) {
+      this.effectGraphics.lineStyle(1.8, 0xffd166, 0.32);
       nodes
         .filter((node) => node.role === "front" || node.role === "left" || node.role === "right")
-        .forEach((node) => this.effectGraphics.strokeCircle(node.position.x, node.position.y, 12 + slime.gapRisk * 12));
+        .forEach((node, index) => {
+          if (index % 2 !== 0) return;
+          this.effectGraphics.strokeCircle(
+            node.position.x,
+            node.position.y,
+            7 + slime.gapRisk * 8,
+          );
+        });
     }
     if (slime.crowding > 0.18) {
       this.effectGraphics.fillStyle(0xff9f43, 0.08 + slime.crowding * 0.12);

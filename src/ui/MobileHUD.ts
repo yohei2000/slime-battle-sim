@@ -85,6 +85,16 @@ export class MobileHUD {
         `亀裂 ${(player.splitStress * 100).toFixed(0)}%  包囲力 ${(player.envelopPower * 100).toFixed(0)}  突破力 ${(player.breakthroughPower * 100).toFixed(0)}`,
     );
     const warnings: string[] = [];
+    if (this.state.winner) {
+      warnings.push(
+        this.state.winner === "player"
+          ? "戦闘終了：勝利"
+          : this.state.winner === "enemy"
+            ? "戦闘終了：敗北"
+            : "戦闘終了：引き分け",
+      );
+      warnings.push("戦場は残響表示中");
+    }
     const linkStress = stressLinks(player);
     const criticalLink = linkStress[0];
     if (this.actions.stressDetailEnabled()) {
@@ -109,6 +119,7 @@ export class MobileHUD {
     if (player.peakLocalStress > player.effectiveToughness)
       warnings.push("局所応力が靱性を超過");
     if (player.splitStress > 0.45) warnings.push("亀裂が連結しています");
+    this.warningText.setColor(this.state.winner ? "#ffffff" : "#ffd166");
     this.warningText.setText(
       warnings.length
         ? this.actions.stressDetailEnabled()
