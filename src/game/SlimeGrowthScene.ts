@@ -117,13 +117,13 @@ export class SlimeGrowthScene extends Phaser.Scene {
 
   private layout(width: number, height: number, compact: boolean): void {
     if (compact) {
-      this.coreRect = { x: 12, y: 74, width: width - 24, height: 104 };
-      this.panelRect = { x: 12, y: 186, width: width - 24, height: 94 };
+      this.coreRect = { x: 12, y: 74, width: width - 24, height: 118 };
+      this.panelRect = { x: 12, y: 200, width: width - 24, height: 106 };
       this.choiceRect = {
         x: 12,
-        y: 288,
+        y: 314,
         width: width - 24,
-        height: Math.max(0, height - 312),
+        height: Math.max(0, height - 338),
       };
       return;
     }
@@ -298,7 +298,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
       this.coreRect.x + 18,
       this.coreRect.y + this.coreRect.height - (compact ? 46 : 54),
       `軍型: ${buildArchetype(this.growth)}\n候補を選ぶたび、軍制スロットが採用または強化されます`,
-      compact ? 10 : 12,
+      compact ? 11 : 12,
       "#d8f4ff",
       500,
       this.coreRect.width - 36,
@@ -310,13 +310,13 @@ export class SlimeGrowthScene extends Phaser.Scene {
     const x = this.coreRect.x + 14;
     const y = this.coreRect.y + 34;
     const width = this.coreRect.width - 28;
-    this.addText(x, y, `軍型: ${buildArchetype(this.growth)}`, 10, "#ffd166", 700, width);
+    this.addText(x, y, `軍型: ${buildArchetype(this.growth)}`, 12, "#ffd166", 700, width);
 
     const columns = 3;
     const gap = 7;
     const pillWidth = (width - gap * (columns - 1)) / columns;
-    const pillHeight = 22;
-    const startY = y + 23;
+    const pillHeight = 26;
+    const startY = y + 24;
     this.growth.slots.forEach((slot) => {
       const column = slot.index % columns;
       const row = Math.floor(slot.index / columns);
@@ -331,17 +331,17 @@ export class SlimeGrowthScene extends Phaser.Scene {
         .setStrokeStyle(slot.evolved ? 2 : 1, slot.evolved ? 0xffd166 : color, slot.skillId ? 0.82 : 0.42)
         .setDepth(3);
       if (slot.skillId) {
-        this.addSkillImage(slot.skillId, px + 12, py + pillHeight / 2, 17, 0.86, 4);
+        this.addSkillImage(slot.skillId, px + 13, py + pillHeight / 2, 19, 0.86, 4);
       }
       const label = slot.skillId ? `${slotLabel(slot)} Lv.${slot.level}` : "空き";
       this.addText(
-        px + (slot.skillId ? 25 : 6),
-        py + 5,
+        px + (slot.skillId ? 28 : 7),
+        py + 6,
         label,
-        8,
+        10,
         definition?.accent ?? "#7f98a5",
         slot.skillId ? 700 : 500,
-        pillWidth - (slot.skillId ? 31 : 12),
+        pillWidth - (slot.skillId ? 35 : 14),
       ).setDepth(4);
       this.objects.push(pill);
     });
@@ -492,7 +492,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
         `兵力 ${projection.mass}  士気 ${projection.morale}  結束 ${projection.cohesion}\n` +
           `疲労 ${projection.fatigue}  防御 ${projection.toughness.toFixed(2)}  命令 ${projection.commandDelay.toFixed(2)}秒\n` +
           `突撃 ${projection.breakthroughPower}  包囲 ${projection.envelopPower}  戦線 ${projection.zocStrength}`,
-        compact ? 9 : 11,
+        compact ? 12 : 11,
         "#eafaff",
         600,
         width,
@@ -641,11 +641,11 @@ export class SlimeGrowthScene extends Phaser.Scene {
     });
 
     const dense = compact && height < 96;
-    this.addText(x + 14, y + 8, `${choiceKindLabel(choice)} / ${definition.organ}`, compact ? 8 : 10, definition.accent, 700, textWidth).setDepth(6);
-    this.addText(x + 14, y + (compact ? 21 : 25), definition.name, dense ? 11 : compact ? 13 : 15, "#eafaff", 700, textWidth).setDepth(6);
+    this.addText(x + 14, y + 8, `${choiceKindLabel(choice)} / ${definition.organ}`, compact ? 10 : 11, definition.accent, 700, textWidth).setDepth(6);
+    this.addText(x + 14, y + (compact ? 24 : 26), definition.name, dense ? 12 : compact ? 14 : 16, "#eafaff", 700, textWidth).setDepth(6);
 
-    const lineStart = y + (compact ? (dense ? 39 : 42) : 48);
-    const lineGap = compact ? (dense ? 12 : 13) : 16;
+    const lineStart = y + (compact ? (dense ? 43 : 48) : 50);
+    const lineGap = compact ? (dense ? 14 : 16) : 18;
     this.addChoiceLine(x + 14, lineStart, "国家", definition.stateText, textWidth, compact, definition.accent);
     if (dense) {
       this.addChoiceLine(x + 14, lineStart + lineGap, "戦場", definition.behaviorText, textWidth, compact, definition.accent);
@@ -666,8 +666,8 @@ export class SlimeGrowthScene extends Phaser.Scene {
     compact: boolean,
     labelColor: string,
   ): void {
-    this.addText(x, y, label, compact ? 8 : 9, labelColor, 700, 34).setDepth(6);
-    this.addText(x + (compact ? 32 : 36), y, text, compact ? 8 : 9, "#cdefff", 500, width - 38).setDepth(6);
+    this.addText(x, y, label, compact ? 10 : 11, labelColor, 700, 38).setDepth(6);
+    this.addText(x + (compact ? 38 : 42), y, text, compact ? 10 : 11, "#cdefff", 500, width - 44).setDepth(6);
   }
 
   private frame(rect: Rect, title: string): void {
@@ -697,7 +697,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
     const text = this.add
       .text(x + width / 2, y + height / 2, label, {
         fontFamily: "Inter, Noto Sans JP, sans-serif",
-        fontSize: width < 72 ? "11px" : "12px",
+        fontSize: width < 72 ? "12px" : "13px",
         color: enabled ? "#eafaff" : "#78909c",
         fontStyle: "bold",
       })
@@ -727,9 +727,10 @@ export class SlimeGrowthScene extends Phaser.Scene {
     weight: number,
     wrapWidth?: number,
   ): Phaser.GameObjects.Text {
+    const readableSize = Math.max(size, 11);
     const object = this.add.text(x, y, text, {
       fontFamily: "Inter, Noto Sans JP, sans-serif",
-      fontSize: `${size}px`,
+      fontSize: `${readableSize}px`,
       color,
       fontStyle: weight >= 700 ? "bold" : "normal",
       lineSpacing: 3,

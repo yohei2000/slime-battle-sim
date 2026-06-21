@@ -21,6 +21,7 @@ import type {
   DiplomacyActionId,
   DomesticOrderId,
   RegionNode,
+  TerrainType,
 } from "../campaign/types";
 
 type LayoutRect = {
@@ -35,20 +36,42 @@ type TextButton = {
   label: Phaser.GameObjects.Text;
 };
 
-const DOMESTIC_ACTIONS: Array<{ id: DomesticOrderId; label: string }> = [
-  { id: "growth", label: "補充" },
-  { id: "rest", label: "休整" },
-  { id: "cohesion", label: "結束" },
-  { id: "hardening", label: "防備" },
+type StrategyAction = {
+  id: DomesticOrderId | DiplomacyActionId;
+  label: string;
+  iconKey: string;
+};
+
+const DOMESTIC_ACTIONS: Array<StrategyAction & { id: DomesticOrderId }> = [
+  { id: "growth", label: "補充", iconKey: "strategy-action-growth" },
+  { id: "rest", label: "休整", iconKey: "strategy-action-rest" },
+  { id: "cohesion", label: "結束", iconKey: "strategy-action-cohesion" },
+  { id: "hardening", label: "防備", iconKey: "strategy-action-hardening" },
 ];
 
-const DIPLOMACY_ACTIONS: Array<{ id: DiplomacyActionId; label: string }> = [
-  { id: "passage", label: "通行" },
-  { id: "supply", label: "補給" },
-  { id: "pressure", label: "威圧" },
+const DIPLOMACY_ACTIONS: Array<StrategyAction & { id: DiplomacyActionId }> = [
+  { id: "passage", label: "通行", iconKey: "strategy-action-passage" },
+  { id: "supply", label: "補給", iconKey: "strategy-action-supply" },
+  { id: "pressure", label: "威圧", iconKey: "strategy-action-pressure" },
 ];
 
 const STRATEGY_BACKGROUND_KEY = "strategy-generated-background";
+const STRATEGY_GENERATED_ASSET_VERSION = "20260621c";
+
+const TERRAIN_NODE_KEYS: Record<TerrainType, string> = {
+  marsh: "strategy-region-marsh-node",
+  plain: "strategy-region-grassland-node",
+  forest: "strategy-region-frontier-node",
+  cavern: "strategy-region-industrial-node",
+  salt: "strategy-region-ruins-node",
+  ruin: "strategy-region-academy-node",
+};
+
+const STRATEGY_IMAGE_KEYS = [
+  ...Object.values(TERRAIN_NODE_KEYS),
+  ...DOMESTIC_ACTIONS.map((action) => action.iconKey),
+  ...DIPLOMACY_ACTIONS.map((action) => action.iconKey),
+];
 
 export class StrategyMapScene extends Phaser.Scene {
   private state: CampaignState = createInitialCampaignState();
@@ -62,6 +85,9 @@ export class StrategyMapScene extends Phaser.Scene {
 
   preload(): void {
     this.load.image(STRATEGY_BACKGROUND_KEY, "assets/generated/ai-strategy-bg-20260621.png");
+    STRATEGY_IMAGE_KEYS.forEach((key) => {
+      this.load.image(key, `assets/generated/${key}-${STRATEGY_GENERATED_ASSET_VERSION}.png`);
+    });
   }
 
   create(): void {
@@ -100,7 +126,7 @@ export class StrategyMapScene extends Phaser.Scene {
         x: 14,
         y: 78,
         width: width - 28,
-        height: Math.max(260, Math.min(330, height * 0.36)),
+        height: Math.max(250, Math.min(300, height * 0.34)),
       };
       this.panelRect = {
         x: 14,
@@ -139,7 +165,7 @@ export class StrategyMapScene extends Phaser.Scene {
       compactHeader
         ? `T${this.state.turn}  糧${this.state.resources.nutrient} 偵${this.state.resources.spores} 工${this.state.resources.gel} 甲${this.state.resources.shell} 記${this.state.resources.memory}`
         : `Turn ${this.state.turn}`,
-      compactHeader ? 10 : 13,
+      compactHeader ? 12 : 13,
       "#7cecff",
       700,
       compactHeader ? Math.max(180, width - 170) : undefined,
@@ -235,19 +261,44 @@ export class StrategyMapScene extends Phaser.Scene {
       const point = this.regionPoint(region);
       const faction = factionById(this.state, region.ownerFactionId);
       const selected = region.id === this.state.selectedRegionId;
-      const radius = selected ? 24 : 20;
-      const outer = this.add
-        .circle(point.x, point.y, radius + 6, 0x071118, 0.84)
-        .setStrokeStyle(selected ? 4 : 2, selected ? 0xffd166 : faction.color, selected ? 0.95 : 0.6)
-        .setDepth(2);
+      const tokenSize = selected ? (compactMap ? 70 : 78) : compactMap ? 58 : 66;
+      const ringRadius = tokenSize * 0.46;
+      const nodeKey = TERRAIN_NODE_KEYS[region.terrain];
+      const glow = this.add
+        .circle(point.x, point.y, ringRadius + 10, faction.color, selected ? 0.2 : 0.1)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setDepth(1.8);
+      const pressureRing = this.add
+        .circle(point.x, point.y, ringRadius + 4, 0x071118, 0.22)
+        .setStrokeStyle(selected ? 4 : 3, selected ? 0xffd166 : faction.color, selected ? 0.98 : 0.66)
+        .setDepth(2.4);
       const node = this.add
-        .circle(point.x, point.y, radius, faction.color, region.ownerFactionId === "player" ? 0.9 : 0.72)
-        .setStrokeStyle(2, 0xeafaff, selected ? 0.85 : 0.34)
+        .image(point.x, point.y, nodeKey)
+        .setDisplaySize(tokenSize, tokenSize)
+        .setAlpha(region.ownerFactionId === "player" ? 0.98 : 0.9)
         .setInteractive({ useHandCursor: true })
         .setDepth(3);
       node.on("pointerup", () => {
         this.state = selectRegion(this.state, region.id);
         this.redraw();
+      });
+      this.tweens.add({
+        targets: node,
+        alpha: selected ? 1 : 0.86,
+        scale: selected ? 1.06 : 1.03,
+        duration: 1700 + region.frontPressure * 8,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
+      });
+      this.tweens.add({
+        targets: glow,
+        alpha: selected ? 0.32 : 0.16,
+        scale: selected ? 1.12 : 1.06,
+        duration: 1700 + region.frontPressure * 8,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
       });
 
       const pressureColor =
@@ -257,16 +308,16 @@ export class StrategyMapScene extends Phaser.Scene {
           ? `${region.name}\n圧${region.frontPressure}%`
           : `${region.name}\n${terrainLabel(region.terrain)}  圧${region.frontPressure}%`;
       const label = this.addText(
-        point.x - 54,
-        point.y + radius + 10,
+        point.x - (compactMap ? 58 : 62),
+        point.y + tokenSize * 0.44 + 8,
         labelText,
-        compactMap ? 10 : 11,
+        compactMap ? 12 : 13,
         pressureColor,
         selected ? 700 : 500,
-        108,
+        compactMap ? 116 : 124,
       );
       label.setAlign("center").setDepth(4);
-      this.objects.push(outer, node, label);
+      this.objects.push(glow, pressureRing, node, label);
     });
   }
 
@@ -322,23 +373,23 @@ export class StrategyMapScene extends Phaser.Scene {
     );
     y += compact ? 34 : 42;
 
-    this.addText(x, y, "軍団", 13, "#7cecff", 700);
+    this.addText(x, y, "軍団", 14, "#7cecff", 700);
     y += 20;
     this.addText(
       x,
       y,
       `兵力 ${this.state.army.mass}  士気 ${this.state.army.morale}  結束 ${this.state.army.cohesion}\n` +
         `疲労 ${this.state.army.fatigue}  防御 ${this.state.army.toughness.toFixed(2)}  命令 ${this.state.army.commandDelay.toFixed(1)}秒`,
-      compact ? 11 : 12,
+      compact ? 12 : 13,
       "#d8f4ff",
       500,
       contentWidth,
     );
-    y += compact ? 42 : 54;
+    y += compact ? 46 : 58;
 
-    this.addText(x, y, "内政", 13, "#7cecff", 700);
+    this.addText(x, y, "内政", 14, "#7cecff", 700);
     y += 22;
-    this.drawButtonRow(
+    const domesticHeight = this.drawButtonRow(
       x,
       y,
       contentWidth,
@@ -349,15 +400,15 @@ export class StrategyMapScene extends Phaser.Scene {
         this.redraw();
       },
     );
-    y += compact ? 38 : 42;
+    y += domesticHeight + (compact ? 12 : 14);
 
     const relationLine =
       diplomacyTarget && diplomacyTarget.id !== "player"
         ? this.relationLine(diplomacyTarget.id)
         : "外交対象なし";
-    this.addText(x, y, `外交: ${relationLine}`, 13, "#7cecff", 700, contentWidth);
+    this.addText(x, y, `外交: ${relationLine}`, 14, "#7cecff", 700, contentWidth);
     y += 22;
-    this.drawButtonRow(
+    const diplomacyHeight = this.drawButtonRow(
       x,
       y,
       contentWidth,
@@ -368,35 +419,29 @@ export class StrategyMapScene extends Phaser.Scene {
         this.redraw();
       },
     );
-    y += compact ? 38 : 42;
+    y += diplomacyHeight + (compact ? 12 : 14);
 
-    this.addText(x, y, "戦闘プレビュー", 13, "#ffd166", 700);
+    this.addText(x, y, "戦闘プレビュー", 14, "#ffd166", 700);
     y += 20;
     this.addPreviewText(x, y, contentWidth, preview, compact);
-    y += compact ? 80 : 126;
+    if (compact) return;
+    y += 128;
 
     const treatyText = relation?.treaties.length
       ? relation.treaties
           .map((treaty) => `${this.treatyLabel(treaty.type)} T${treaty.expiresTurn}まで`)
           .join(" / ")
       : "条約なし";
-    if (compact) {
-      this.addText(x, y, `条約: ${treatyText}`, 10, "#bad7e4", 500, contentWidth);
-      y += 20;
-    } else {
-      this.addText(x, y, `地域資源: ${resourceText(selected.resources)}\n条約: ${treatyText}`, 11, "#bad7e4", 500, contentWidth);
-      y += 52;
-    }
+    this.addText(x, y, `地域資源: ${resourceText(selected.resources)}\n条約: ${treatyText}`, 12, "#bad7e4", 500, contentWidth);
+    y += 52;
 
-    const logTop = compact
-      ? this.panelRect.y + this.panelRect.height - 78
-      : Math.min(y, this.panelRect.y + this.panelRect.height - 118);
-    this.addText(x, logTop, "レポート", 12, "#7cecff", 700);
+    const logTop = Math.min(y, this.panelRect.y + this.panelRect.height - 118);
+    this.addText(x, logTop, "レポート", 13, "#7cecff", 700);
     this.addText(
       x,
       logTop + 18,
-      this.state.reports.slice(0, compact ? 3 : 5).map((report) => `・${report}`).join("\n"),
-      compact ? 10 : 11,
+      this.state.reports.slice(0, 5).map((report) => `・${report}`).join("\n"),
+      12,
       "#d8f4ff",
       500,
       contentWidth,
@@ -431,21 +476,23 @@ export class StrategyMapScene extends Phaser.Scene {
       `自軍 兵${preview.playerInitial.mass} 士${preview.playerInitial.morale} 結${preview.playerInitial.cohesion} 疲${preview.playerInitial.fatigue}\n` +
       `敵軍 兵${preview.enemyInitial.mass} 士${preview.enemyInitial.morale} 結${preview.enemyInitial.cohesion} 疲${preview.enemyInitial.fatigue}\n` +
       (compact
-        ? `${preview.terrainNotes[0]}\n${preview.strategicNotes[0]}`
+        ? `${preview.terrainNotes[0]}`
         : `${preview.terrainNotes[0]}\n${preview.strategicNotes.slice(0, 4).join(" / ")}`);
-    this.addText(x, y, text, compact ? 10 : 11, "#eefaff", 500, width);
+    this.addText(x, y, text, compact ? 12 : 12, "#eefaff", 500, width);
   }
 
-  private drawButtonRow<T extends { label: string }>(
+  private drawButtonRow<T extends { label: string; iconKey?: string }>(
     x: number,
     y: number,
     width: number,
     actions: T[],
     enabled: (action: T) => boolean,
     onClick: (action: T) => void,
-  ): void {
+  ): number {
     const gap = 8;
-    const columns = width < 320 ? 2 : actions.length;
+    const compactButtons = this.scale.width < 580;
+    const columns = compactButtons ? Math.min(2, actions.length) : actions.length;
+    const buttonHeight = compactButtons ? 40 : 34;
     const buttonWidth = Math.floor((width - gap * (columns - 1)) / columns);
     actions.forEach((action, index) => {
       const row = Math.floor(index / columns);
@@ -453,14 +500,17 @@ export class StrategyMapScene extends Phaser.Scene {
       this.makeButton(
         action.label,
         x + column * (buttonWidth + gap),
-        y + row * 36,
+        y + row * (buttonHeight + gap),
         buttonWidth,
-        30,
+        buttonHeight,
         () => onClick(action),
         enabled(action),
         0x163242,
+        action.iconKey,
       );
     });
+    const rows = Math.ceil(actions.length / columns);
+    return rows * buttonHeight + (rows - 1) * gap;
   }
 
   private relationLine(factionId: string): string {
@@ -493,15 +543,25 @@ export class StrategyMapScene extends Phaser.Scene {
     onClick: () => void,
     enabled = true,
     fillColor = 0x163242,
+    iconKey?: string,
   ): TextButton {
     const background = this.add
       .rectangle(x, y, width, height, enabled ? fillColor : 0x18232a, enabled ? 0.96 : 0.6)
       .setOrigin(0)
       .setStrokeStyle(2, enabled ? 0x7cecff : 0x425462, enabled ? 0.62 : 0.32);
+    const iconSize = iconKey ? Math.min(height - 8, Math.max(22, width * 0.26)) : 0;
+    const icon = iconKey
+      ? this.add
+          .image(x + 9 + iconSize / 2, y + height / 2, iconKey)
+          .setDisplaySize(iconSize, iconSize)
+          .setAlpha(enabled ? 0.98 : 0.42)
+      : undefined;
+    const textX = iconKey ? x + iconSize + 14 : x;
+    const textWidth = iconKey ? width - iconSize - 16 : width;
     const text = this.add
-      .text(x + width / 2, y + height / 2, label, {
+      .text(textX + textWidth / 2, y + height / 2, label, {
         fontFamily: "Inter, Noto Sans JP, sans-serif",
-        fontSize: width < 54 ? "10px" : "12px",
+        fontSize: height >= 38 ? "13px" : "12px",
         color: enabled ? "#eafaff" : "#78909c",
         fontStyle: "bold",
       })
@@ -517,7 +577,7 @@ export class StrategyMapScene extends Phaser.Scene {
       });
     }
 
-    this.objects.push(background, text);
+    this.objects.push(...(icon ? [background, icon, text] : [background, text]));
     return { background, label: text };
   }
 
@@ -530,9 +590,10 @@ export class StrategyMapScene extends Phaser.Scene {
     weight: number,
     wrapWidth?: number,
   ): Phaser.GameObjects.Text {
+    const readableSize = Math.max(size, this.scale.width < 580 ? 12 : 11);
     const object = this.add.text(x, y, text, {
       fontFamily: "Inter, Noto Sans JP, sans-serif",
-      fontSize: `${size}px`,
+      fontSize: `${readableSize}px`,
       color,
       fontStyle: weight >= 700 ? "bold" : "normal",
       lineSpacing: 3,
