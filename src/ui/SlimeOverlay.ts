@@ -46,6 +46,23 @@ function smoothClosed(points: Vector2Like[], passes = 2): Vector2Like[] {
   return result;
 }
 
+function smoothOpen(points: Vector2Like[], passes = 2): Vector2Like[] {
+  if (points.length < 3) return points.map((point) => ({ ...point }));
+  let result = points.map((point) => ({ ...point }));
+  for (let pass = 0; pass < passes; pass += 1) {
+    const next: Vector2Like[] = [{ ...result[0] }];
+    for (let i = 0; i < result.length - 1; i += 1) {
+      const a = result[i];
+      const b = result[i + 1];
+      next.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
+      next.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+    }
+    next.push({ ...result[result.length - 1] });
+    result = next;
+  }
+  return result;
+}
+
 function drawPolygon(graphics: Phaser.GameObjects.Graphics, points: Vector2Like[]): void {
   if (points.length < 3) return;
   graphics.beginPath();
@@ -53,6 +70,14 @@ function drawPolygon(graphics: Phaser.GameObjects.Graphics, points: Vector2Like[
   for (let i = 1; i < points.length; i += 1) graphics.lineTo(points[i].x, points[i].y);
   graphics.closePath();
   graphics.fillPath();
+  graphics.strokePath();
+}
+
+function drawPolyline(graphics: Phaser.GameObjects.Graphics, points: Vector2Like[]): void {
+  if (points.length < 2) return;
+  graphics.beginPath();
+  graphics.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i += 1) graphics.lineTo(points[i].x, points[i].y);
   graphics.strokePath();
 }
 
@@ -164,6 +189,77 @@ export class SlimeOverlay {
     );
   }
 
+  private armChainNodes(boundary: SlimeNode[]): SlimeNode[] {
+    if (boundary.length < 6) return boundary;
+    const frontGapAngle = 0.48;
+    const withAngles = boundary
+      .map((node) => ({
+        node,
+        angle: Math.atan2(node.shapeV, node.shapeU),
+      }))
+      .filter(
+        ({ angle, node }) =>
+          Math.abs(angle) >= frontGapAngle || node.shapeU < 0.4,
+      );
+    if (withAngles.length < 4) return boundary;
+    const leftArc = withAngles
+      .filter(({ angle }) => angle >= frontGapAngle)
+      .sort((a, b) => a.angle - b.angle);
+    const rightArc = withAngles
+      .filter(({ angle }) => angle <= -frontGapAngle)
+      .sort((a, b) => a.angle - b.angle);
+    const chain = [...leftArc, ...rightArc].map(({ node }) => node);
+    return chain.length >= 4 ? chain : boundary;
+  }
+
+  private armChainPoints(boundary: SlimeNode[]): Vector2Like[] {
+    return this.armChainNodes(boundary).map((node) => ({ ...node.position }));
+  }
+
+  private segmentsFromPolyline(points: Vector2Like[]): Array<{
+    start: Vector2Like;
+    end: Vector2Like;
+  }> {
+    const segments: Array<{ start: Vector2Like; end: Vector2Like }> = [];
+    for (let i = 0; i < points.length - 1; i += 1) {
+      segments.push({ start: points[i], end: points[i + 1] });
+    }
+    return segments;
+  }
+
+  private exclusiveSegmentsFrom(
+    slime: ArmySlime,
+    enemies: ArmySlime[],
+    segments: Array<{ start: Vector2Like; end: Vector2Like }>,
+  ): Array<{ start: Vector2Like; end: Vector2Like }> {
+    if (enemies.length === 0) return segments;
+    const exclusiveSegments: Array<{ start: Vector2Like; end: Vector2Like }> = [];
+    const subdivisionCount = 3;
+    for (const segment of segments) {
+      let previous = { ...segment.start };
+      for (let i = 1; i <= subdivisionCount; i += 1) {
+        const next = {
+          x:
+            segment.start.x +
+            (segment.end.x - segment.start.x) * (i / subdivisionCount),
+          y:
+            segment.start.y +
+            (segment.end.y - segment.start.y) * (i / subdivisionCount),
+        };
+        const midpoint = scale(add(previous, next), 0.5);
+        if (
+          isZocCenterlineOpen(slime, enemies, previous) &&
+          isZocCenterlineOpen(slime, enemies, midpoint) &&
+          isZocCenterlineOpen(slime, enemies, next)
+        ) {
+          exclusiveSegments.push({ start: { ...previous }, end: { ...next } });
+        }
+        previous = next;
+      }
+    }
+    return exclusiveSegments;
+  }
+
   private zocBlockedRatio(slime: ArmySlime, enemies: ArmySlime[]): number {
     if (enemies.length === 0) return 0;
     const segments = getZocFieldSegments(slime);
@@ -210,7 +306,13 @@ export class SlimeOverlay {
       this.drawContainedZocPocket(slime, zocColor, time);
       return;
     }
-    const segments = getExclusiveZocFieldSegments(slime, enemies);
+    const segments = this.shouldDrawAsArms(slime)
+      ? this.exclusiveSegmentsFrom(
+          slime,
+          enemies,
+          this.segmentsFromPolyline(smoothOpen(this.armChainPoints(boundary), 2)),
+        )
+      : getExclusiveZocFieldSegments(slime, enemies);
     const thickness = getZocBoundaryThickness(slime);
     const fieldWidth = thickness * 1.55;
     const fillAlpha = slime.posture === "envelop" ? 0.035 : 0.032;
@@ -226,7 +328,10 @@ export class SlimeOverlay {
       );
     }
     this.zocGraphics.fillStyle(zocColor, fillAlpha * 0.86);
-    for (const node of boundary) {
+    const zocNodeAnchors = this.shouldDrawAsArms(slime)
+      ? this.armChainNodes(boundary)
+      : boundary;
+    for (const node of zocNodeAnchors) {
       if (!isZocCenterlineOpen(slime, enemies, node.position)) continue;
       this.zocGraphics.fillCircle(
         node.position.x,
@@ -327,7 +432,11 @@ export class SlimeOverlay {
     fillColor: number,
     edgeColor: number,
   ): void {
-    const segments = getZocFieldSegments(slime);
+    const chainNodes = this.armChainNodes(boundary);
+    const chainPoints = smoothOpen(
+      chainNodes.map((node) => ({ ...node.position })),
+      3,
+    );
     const bodyWidth = clamp(
       24 + slime.currentDensity * 18 + slime.pressure * 0.08,
       30,
@@ -337,16 +446,9 @@ export class SlimeOverlay {
     const edgeAlpha = slime.isSelected ? 0.96 : 0.58;
 
     this.bodyGraphics.lineStyle(bodyWidth, fillColor, fillAlpha);
-    for (const segment of segments) {
-      this.bodyGraphics.lineBetween(
-        segment.start.x,
-        segment.start.y,
-        segment.end.x,
-        segment.end.y,
-      );
-    }
+    drawPolyline(this.bodyGraphics, chainPoints);
     this.bodyGraphics.fillStyle(fillColor, fillAlpha * 1.05);
-    for (const node of boundary) {
+    for (const node of chainNodes) {
       this.bodyGraphics.fillCircle(
         node.position.x,
         node.position.y,
@@ -359,14 +461,7 @@ export class SlimeOverlay {
       slime.isRouting ? 0xffd166 : edgeColor,
       edgeAlpha,
     );
-    for (const segment of segments) {
-      this.bodyGraphics.lineBetween(
-        segment.start.x,
-        segment.start.y,
-        segment.end.x,
-        segment.end.y,
-      );
-    }
+    drawPolyline(this.bodyGraphics, chainPoints);
   }
 
   private drawNodeDensity(slime: ArmySlime, fillColor: number): void {
