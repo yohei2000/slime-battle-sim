@@ -16,7 +16,7 @@ import {
   scale,
   sub,
 } from "../sim/vector";
-import { getZocFieldSegments } from "../sim/zoc";
+import { getZocBoundaryThickness, getZocFieldSegments } from "../sim/zoc";
 
 const COLORS = {
   player: { fill: 0x28bde9, edge: 0x9ceeff, particle: 0xd9faff, zoc: 0x2dd4ef },
@@ -144,11 +144,12 @@ export class SlimeOverlay {
     zocColor: number,
   ): void {
     const segments = getZocFieldSegments(slime);
-    const width = clamp(slime.zocRadius * 1.45, 28, 94);
-    const fillAlpha = slime.posture === "envelop" ? 0.04 : 0.047;
-    const edgeAlpha = slime.posture === "envelop" ? 0.22 : 0.18;
+    const thickness = getZocBoundaryThickness(slime);
+    const fieldWidth = thickness * 1.55;
+    const fillAlpha = slime.posture === "envelop" ? 0.035 : 0.032;
+    const edgeAlpha = slime.posture === "envelop" ? 0.58 : 0.46;
 
-    this.zocGraphics.lineStyle(width, zocColor, fillAlpha);
+    this.zocGraphics.lineStyle(fieldWidth, zocColor, fillAlpha);
     for (const segment of segments) {
       this.zocGraphics.lineBetween(
         segment.start.x,
@@ -159,10 +160,14 @@ export class SlimeOverlay {
     }
     this.zocGraphics.fillStyle(zocColor, fillAlpha * 0.86);
     for (const node of boundary) {
-      this.zocGraphics.fillCircle(node.position.x, node.position.y, width * 0.5);
+      this.zocGraphics.fillCircle(
+        node.position.x,
+        node.position.y,
+        fieldWidth * 0.48,
+      );
     }
 
-    this.zocGraphics.lineStyle(1.35, zocColor, edgeAlpha);
+    this.zocGraphics.lineStyle(2.4, zocColor, edgeAlpha);
     for (const segment of segments) {
       this.zocGraphics.lineBetween(
         segment.start.x,

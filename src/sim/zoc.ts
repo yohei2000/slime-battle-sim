@@ -19,9 +19,7 @@ export type ZocFieldSegment = {
 
 type BoundaryCacheEntry = {
   bodyPoints: Vector2Like[];
-  bodySegments: ZocFieldSegment[];
   zocSegments: ZocFieldSegment[];
-  zocPointsByScale: Map<number, Vector2Like[]>;
 };
 
 const boundaryCache = new WeakMap<ArmySlime, BoundaryCacheEntry>();
@@ -38,28 +36,6 @@ function sortedBoundary(slime: ArmySlime, nodes: SlimeNode[]): SlimeNode[] {
       Math.atan2(a.position.y - center.y, a.position.x - center.x) -
       Math.atan2(b.position.y - center.y, b.position.x - center.x),
   );
-}
-
-function uniqueLinkSegments(slime: ArmySlime): ZocFieldSegment[] {
-  const byId = new Map(slime.nodes.map((node) => [node.id, node]));
-  const seen = new Set<string>();
-  const segments: ZocFieldSegment[] = [];
-  for (const node of slime.nodes) {
-    for (const link of node.links) {
-      if (link.broken) continue;
-      const key = [link.nodeAId, link.nodeBId].sort().join("|");
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const a = byId.get(link.nodeAId);
-      const b = byId.get(link.nodeBId);
-      if (!a || !b) continue;
-      segments.push({
-        start: { ...a.position },
-        end: { ...b.position },
-      });
-    }
-  }
-  return segments;
 }
 
 function ringSegments(nodes: SlimeNode[]): ZocFieldSegment[] {
@@ -87,9 +63,7 @@ function cachedBoundary(slime: ArmySlime): BoundaryCacheEntry {
   }));
   const entry: BoundaryCacheEntry = {
     bodyPoints,
-    bodySegments: uniqueLinkSegments(slime),
     zocSegments: ringSegments(sortedNodes),
-    zocPointsByScale: new Map(),
   };
   boundaryCache.set(slime, entry);
   return entry;
@@ -109,21 +83,6 @@ function closestPointOnSegment(
   if (lengthSquared < 0.0001) return { ...start };
   const t = clamp(dot(sub(point, start), segment) / lengthSquared, 0, 1);
   return add(start, scale(segment, t));
-}
-
-function smoothClosed(points: Vector2Like[], passes = 2): Vector2Like[] {
-  let result = points.map((point) => ({ ...point }));
-  for (let pass = 0; pass < passes; pass += 1) {
-    const next: Vector2Like[] = [];
-    for (let i = 0; i < result.length; i += 1) {
-      const a = result[i];
-      const b = result[(i + 1) % result.length];
-      next.push(add(scale(a, 0.75), scale(b, 0.25)));
-      next.push(add(scale(a, 0.25), scale(b, 0.75)));
-    }
-    result = next;
-  }
-  return result;
 }
 
 function segmentOutwardNormal(
@@ -150,33 +109,16 @@ export function getZocFieldSegments(slime: ArmySlime): ZocFieldSegment[] {
   }));
 }
 
-export function getZocBoundaryPoints(
-  slime: ArmySlime,
-  clearanceScale = 1,
-): Vector2Like[] {
-  const cache = cachedBoundary(slime);
-  const cacheKey = Math.round(clearanceScale * 1000) / 1000;
-  const cached = cache.zocPointsByScale.get(cacheKey);
-  if (cached) return cached.map((point) => ({ ...point }));
-
-  const body = cache.bodyPoints;
-  if (body.length < 3) return body;
-  const clearance = slime.zocRadius * clearanceScale;
-  const expanded = body.map((point, index) => {
-    const previous = body[(index - 1 + body.length) % body.length];
-    const next = body[(index + 1) % body.length];
-    const previousNormal = segmentOutwardNormal(previous, point, slime.center);
-    const nextNormal = segmentOutwardNormal(point, next, slime.center);
-    const averagedNormal = normalize(add(previousNormal, nextNormal));
-    const safeNormal =
-      dot(averagedNormal, sub(point, slime.center)) > 0.05
-        ? averagedNormal
-        : normalize(sub(point, slime.center));
-    return add(point, scale(safeNormal, clearance));
-  });
-  const zocPoints = smoothClosed(expanded);
-  cache.zocPointsByScale.set(cacheKey, zocPoints);
-  return zocPoints.map((point) => ({ ...point }));
+export function getZocBoundaryThickness(slime: ArmySlime): number {
+  return clamp(
+    8 +
+      slime.currentDensity * 4.5 +
+      slime.zocStrength * 2.5 +
+      (slime.posture === "envelop" ? 1.5 : 0) -
+      slime.gapRisk * 4,
+    8,
+    18,
+  );
 }
 
 function closestSegmentFieldSample(
@@ -197,11 +139,7 @@ function closestSegmentFieldSample(
     if (candidateDistance < closestDistance) {
       closestPoint = candidate;
       closestDistance = candidateDistance;
-      const fromSegment = sub(point, candidate);
-      outwardNormal =
-        Math.hypot(fromSegment.x, fromSegment.y) > 0.001
-          ? normalize(fromSegment)
-          : segmentOutwardNormal(segment.start, segment.end, center);
+      outwardNormal = segmentOutwardNormal(segment.start, segment.end, center);
     }
   }
   return { closestPoint, distance: closestDistance, outwardNormal };
@@ -213,29 +151,22 @@ export function sampleEnemyZoc(
   clearanceScale = 1,
 ): ZocBoundarySample {
   const cache = cachedBoundary(enemy);
-  const bodySegments =
-    cache.bodySegments.length > 0 ? cache.bodySegments : cache.zocSegments;
   const zocSegments =
-    cache.zocSegments.length > 0 ? cache.zocSegments : bodySegments;
-  const bodySample = closestSegmentFieldSample(
-    bodySegments,
-    enemy.center,
-    point,
-  );
+    cache.zocSegments.length > 0 ? cache.zocSegments : [];
   const zocSample = closestSegmentFieldSample(zocSegments, enemy.center, point);
-  const clearance = enemy.zocRadius * clearanceScale;
-  const bodyTubeRadius = 16 + Math.min(1.8, enemy.currentDensity) * 12;
-  const insideBody = bodySample.distance <= bodyTubeRadius;
+  const clearance = getZocBoundaryThickness(enemy) * clearanceScale;
+  const bodyTubeRadius = clearance * 0.9;
+  const insideBody = zocSample.distance <= bodyTubeRadius;
   const insideZoc = insideBody || zocSample.distance <= clearance;
   const penetration = insideBody
-    ? Math.max(clearance, bodyTubeRadius - bodySample.distance)
+    ? Math.max(clearance, bodyTubeRadius - zocSample.distance)
     : clearance - zocSample.distance;
 
   return {
-    closestPoint: bodySample.closestPoint,
+    closestPoint: zocSample.closestPoint,
     zocClosestPoint: zocSample.closestPoint,
     outwardNormal: zocSample.outwardNormal,
-    distance: bodySample.distance,
+    distance: zocSample.distance,
     insideBody,
     insideZoc,
     clearance,
