@@ -26,6 +26,10 @@ import {
   getZocFieldSegments,
   isZocCenterlineOpen,
 } from "../sim/zoc";
+import {
+  tacticalHints,
+  type TacticalHintKind,
+} from "../sim/tacticalHints";
 
 const COLORS = {
   player: { fill: 0x28bde9, edge: 0x9ceeff, particle: 0xd9faff, zoc: 0x2dd4ef },
@@ -92,6 +96,7 @@ export class SlimeOverlay {
   private readonly labels = new Map<string, Phaser.GameObjects.Text>();
   private readonly detailLabelLayer: Phaser.GameObjects.Container;
   private causeLabel?: Phaser.GameObjects.Text;
+  private readonly hintLabels = new Map<string, Phaser.GameObjects.Text>();
   private stressDetail = false;
 
   constructor(scene: Phaser.Scene) {
@@ -126,9 +131,18 @@ export class SlimeOverlay {
     this.particleGraphics.clear();
     this.effectGraphics.clear();
     this.causeLabel?.setVisible(false);
+    for (const label of this.hintLabels.values()) label.setVisible(false);
     const containedZocIds = this.containedZocIds(slimes);
     for (const slime of slimes)
       this.drawSlime(slime, time, slimes, containedZocIds);
+    const selectedPlayer =
+      slimes.find((slime) => slime.side === "player" && slime.isSelected) ??
+      slimes.find((slime) => slime.side === "player");
+    if (selectedPlayer) {
+      for (const enemy of slimes.filter((slime) => slime.side !== selectedPlayer.side)) {
+        this.drawTacticalHints(selectedPlayer, enemy, time);
+      }
+    }
     this.updateLabels(slimes);
   }
 
@@ -479,6 +493,90 @@ export class SlimeOverlay {
         pressureAlpha;
       this.bodyGraphics.fillStyle(fillColor, densityAlpha);
       this.bodyGraphics.fillCircle(node.position.x, node.position.y, radius);
+    }
+  }
+
+  private hintColor(kind: TacticalHintKind): number {
+    if (kind === "breakthrough") return 0xffd166;
+    if (kind === "pressure" || kind === "stability") return 0xff8c42;
+    return 0x7cecff;
+  }
+
+  private hintShortLabel(kind: TacticalHintKind): string {
+    if (kind === "breakthrough") return "薄";
+    if (kind === "pressure") return "圧";
+    if (kind === "stability") return "包";
+    return "側";
+  }
+
+  private drawTacticalHints(
+    player: ArmySlime,
+    enemy: ArmySlime,
+    time: number,
+  ): void {
+    const inverseZoom = 1 / Math.max(0.12, this.scene.cameras.main.zoom);
+    const hints = tacticalHints(player, enemy);
+    for (const hint of hints) {
+      const color = this.hintColor(hint.kind);
+      const pulse = 1 + Math.sin(time * 0.006 + hint.strength * 4) * 0.08;
+      const radius = (9 + hint.strength * 10) * pulse;
+      const alpha = 0.34 + hint.strength * 0.32;
+
+      this.effectGraphics.lineStyle(2.2, color, alpha);
+      this.effectGraphics.strokeCircle(hint.point.x, hint.point.y, radius);
+      this.effectGraphics.lineStyle(1.2, 0xffffff, 0.34);
+      this.effectGraphics.lineBetween(
+        hint.point.x - radius * 0.65,
+        hint.point.y,
+        hint.point.x + radius * 0.65,
+        hint.point.y,
+      );
+      this.effectGraphics.lineBetween(
+        hint.point.x,
+        hint.point.y - radius * 0.65,
+        hint.point.x,
+        hint.point.y + radius * 0.65,
+      );
+
+      if (hint.kind === "envelop-left" || hint.kind === "envelop-right") {
+        const sweep = hint.kind === "envelop-left" ? 1 : -1;
+        this.effectGraphics.lineStyle(3, color, 0.28 + hint.strength * 0.18);
+        this.effectGraphics.beginPath();
+        this.effectGraphics.arc(
+          hint.point.x,
+          hint.point.y,
+          radius + 8,
+          sweep > 0 ? -0.2 : Math.PI - 0.2,
+          sweep > 0 ? 1.15 : Math.PI + 1.15,
+          false,
+        );
+        this.effectGraphics.strokePath();
+      }
+
+      const labelId = `${enemy.id}-${hint.id}`;
+      let label = this.hintLabels.get(labelId);
+      if (!label) {
+        label = this.scene.add
+          .text(0, 0, "", {
+            fontFamily: "Inter, Noto Sans JP, sans-serif",
+            fontSize: "11px",
+            fontStyle: "bold",
+            color: "#ffffff",
+            backgroundColor: "#07131dcc",
+            padding: { x: 4, y: 2 },
+            stroke: "#07131d",
+            strokeThickness: 2,
+          })
+          .setOrigin(0.5)
+          .setResolution(2);
+        this.labelLayer.add(label);
+        this.hintLabels.set(labelId, label);
+      }
+      label
+        .setText(this.hintShortLabel(hint.kind))
+        .setPosition(hint.point.x, hint.point.y - radius - 10 * inverseZoom)
+        .setScale(inverseZoom)
+        .setVisible(true);
     }
   }
 

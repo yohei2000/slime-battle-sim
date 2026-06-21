@@ -3,6 +3,7 @@ import type { BattleState } from "../sim/types";
 import { postureLabel } from "../sim/slime";
 import { encirclementStage, ringIntegrity } from "../sim/encirclement";
 import { shortNodeName, stressCause, stressLinks } from "../sim/stressDiagnostics";
+import { tacticalHints } from "../sim/tacticalHints";
 
 type HudActions = {
   togglePause: () => void;
@@ -85,6 +86,16 @@ export class MobileHUD {
         `亀裂 ${(player.splitStress * 100).toFixed(0)}%  包囲力 ${(player.envelopPower * 100).toFixed(0)}  突破力 ${(player.breakthroughPower * 100).toFixed(0)}`,
     );
     const warnings: string[] = [];
+    const infoLines: string[] = [];
+    const hints = tacticalHints(player, enemy);
+    if (hints.length > 0) {
+      infoLines.push(
+        `狙い材料: ${hints
+          .slice(0, 3)
+          .map((hint) => `${hint.label}${Math.round(hint.strength * 100)}%`)
+          .join(" / ")}`,
+      );
+    }
     if (this.state.winner) {
       warnings.push(
         this.state.winner === "player"
@@ -128,10 +139,10 @@ export class MobileHUD {
     if (player.splitStress > 0.45) warnings.push("亀裂が連結しています");
     this.warningText.setColor(this.state.winner ? "#ffffff" : "#ffd166");
     this.warningText.setText(
-      warnings.length
+      warnings.length || infoLines.length
         ? this.actions.stressDetailEnabled()
-          ? `応力解析\n${warnings.join("\n")}`
-          : `⚠ ${warnings.join("\n⚠ ")}`
+          ? `${infoLines.join("\n")}${infoLines.length && warnings.length ? "\n" : ""}応力解析\n${warnings.join("\n")}`
+          : `${infoLines.join("\n")}${infoLines.length && warnings.length ? "\n" : ""}${warnings.map((warning) => `⚠ ${warning}`).join("\n")}`
         : "形状は安定",
     );
     this.pauseButton.label.setText(this.state.paused ? "▶" : "Ⅱ");
