@@ -96,20 +96,24 @@ export class SlimeGrowthScene extends Phaser.Scene {
     this.addBackground(width, height);
     this.addHeader(width, compact);
     this.layout(width, height, compact);
-    this.drawCore(compact);
+    if (compact) {
+      this.drawMobileSlotStrip();
+    } else {
+      this.drawCore(false);
+    }
     this.drawPanel(compact);
     this.drawChoices(compact);
   }
 
   private layout(width: number, height: number, compact: boolean): void {
     if (compact) {
-      this.coreRect = { x: 14, y: 78, width: width - 28, height: 232 };
-      this.panelRect = { x: 14, y: 322, width: width - 28, height: 128 };
+      this.coreRect = { x: 12, y: 74, width: width - 24, height: 104 };
+      this.panelRect = { x: 12, y: 186, width: width - 24, height: 94 };
       this.choiceRect = {
-        x: 14,
-        y: 462,
-        width: width - 28,
-        height: Math.max(232, height - 476),
+        x: 12,
+        y: 288,
+        width: width - 24,
+        height: Math.max(0, height - 312),
       };
       return;
     }
@@ -290,6 +294,37 @@ export class SlimeGrowthScene extends Phaser.Scene {
     );
   }
 
+  private drawMobileSlotStrip(): void {
+    this.frame(this.coreRect, "軍制スロット");
+    const x = this.coreRect.x + 14;
+    const y = this.coreRect.y + 34;
+    const width = this.coreRect.width - 28;
+    this.addText(x, y, `軍型: ${buildArchetype(this.growth)}`, 10, "#ffd166", 700, width);
+
+    const columns = 3;
+    const gap = 7;
+    const pillWidth = (width - gap * (columns - 1)) / columns;
+    const pillHeight = 22;
+    const startY = y + 23;
+    this.growth.slots.forEach((slot) => {
+      const column = slot.index % columns;
+      const row = Math.floor(slot.index / columns);
+      const px = x + column * (pillWidth + gap);
+      const py = startY + row * (pillHeight + 7);
+      const definition = slot.skillId ? skillDefinition(slot.skillId) : undefined;
+      const color = definition?.color ?? 0x2b5363;
+      const fill = slot.skillId ? 0x102632 : 0x091722;
+      const pill = this.add
+        .rectangle(px, py, pillWidth, pillHeight, fill, slot.skillId ? 0.96 : 0.72)
+        .setOrigin(0)
+        .setStrokeStyle(slot.evolved ? 2 : 1, slot.evolved ? 0xffd166 : color, slot.skillId ? 0.82 : 0.42)
+        .setDepth(3);
+      const label = slot.skillId ? `${slotLabel(slot)} Lv.${slot.level}` : "空き";
+      this.addText(px + 6, py + 5, label, 8, definition?.accent ?? "#7f98a5", slot.skillId ? 700 : 500, pillWidth - 12).setDepth(4);
+      this.objects.push(pill);
+    });
+  }
+
   private addCoreHighlights(center: { x: number; y: number }, radius: number): void {
     const halo = this.add
       .ellipse(center.x, center.y, radius * 2.36, radius * 1.84, 0x7cecff, 0.08)
@@ -420,7 +455,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
     this.frame(this.panelRect, "戦闘反映");
     const projection = battleProjection(this.growth);
     const x = this.panelRect.x + 14;
-    let y = this.panelRect.y + 38;
+    let y = this.panelRect.y + (compact ? 32 : 38);
     const width = this.panelRect.width - 28;
 
     const tightPanel = compact || this.panelRect.height < 300;
@@ -431,9 +466,8 @@ export class SlimeGrowthScene extends Phaser.Scene {
         `現在型: ${buildArchetype(this.growth)}\n` +
         `兵力 ${projection.mass}  士気 ${projection.morale}  結束 ${projection.cohesion}\n` +
           `疲労 ${projection.fatigue}  防御 ${projection.toughness.toFixed(2)}  命令 ${projection.commandDelay.toFixed(2)}秒\n` +
-          `突撃 ${projection.breakthroughPower}  包囲 ${projection.envelopPower}  戦線 ${projection.zocStrength}\n` +
-          "軍制が戦場の伸縮と分断耐性に変わります",
-        compact ? 10 : 11,
+          `突撃 ${projection.breakthroughPower}  包囲 ${projection.envelopPower}  戦線 ${projection.zocStrength}`,
+        compact ? 9 : 11,
         "#eafaff",
         600,
         width,
@@ -488,7 +522,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
     const cardGap = compact ? 8 : 12;
     const cardWidth = compact ? width : (width - cardGap * 2) / 3;
     const cardHeight = compact
-      ? Math.max(76, (this.choiceRect.height - 38 - cardGap * 2) / 3)
+      ? Math.max(58, (this.choiceRect.height - 38 - cardGap * 2) / 3)
       : this.choiceRect.height - 38;
 
     this.growth.choices.forEach((choice, index) => {
@@ -571,15 +605,20 @@ export class SlimeGrowthScene extends Phaser.Scene {
       this.redraw();
     });
 
-    this.addText(x + 14, y + 8, `${choiceKindLabel(choice)} / ${definition.organ}`, compact ? 9 : 10, definition.accent, 700, width - 22).setDepth(6);
-    this.addText(x + 14, y + (compact ? 22 : 25), definition.name, compact ? 13 : 15, "#eafaff", 700, width - 22).setDepth(6);
+    const dense = compact && height < 96;
+    this.addText(x + 14, y + 8, `${choiceKindLabel(choice)} / ${definition.organ}`, compact ? 8 : 10, definition.accent, 700, width - 44).setDepth(6);
+    this.addText(x + 14, y + (compact ? 21 : 25), definition.name, dense ? 11 : compact ? 13 : 15, "#eafaff", 700, width - 44).setDepth(6);
 
-    const lineStart = y + (compact ? 42 : 48);
-    const lineGap = compact ? 13 : 16;
+    const lineStart = y + (compact ? (dense ? 39 : 42) : 48);
+    const lineGap = compact ? (dense ? 12 : 13) : 16;
     this.addChoiceLine(x + 14, lineStart, "国家", definition.stateText, width - 28, compact, definition.accent);
-    this.addChoiceLine(x + 14, lineStart + lineGap, "運用", definition.operationText, width - 28, compact, definition.accent);
-    this.addChoiceLine(x + 14, lineStart + lineGap * 2, "戦場", definition.behaviorText, width - 28, compact, definition.accent);
-    this.addChoiceLine(x + 14, lineStart + lineGap * 3, "弱点", definition.weaknessText, width - 28, compact, "#ffb3c4");
+    if (dense) {
+      this.addChoiceLine(x + 14, lineStart + lineGap, "戦場", definition.behaviorText, width - 28, compact, definition.accent);
+    } else {
+      this.addChoiceLine(x + 14, lineStart + lineGap, "運用", definition.operationText, width - 28, compact, definition.accent);
+      this.addChoiceLine(x + 14, lineStart + lineGap * 2, "戦場", definition.behaviorText, width - 28, compact, definition.accent);
+      this.addChoiceLine(x + 14, lineStart + lineGap * 3, "弱点", definition.weaknessText, width - 28, compact, "#ffb3c4");
+    }
     this.objects.push(glow, background, stripe, insignia);
   }
 
