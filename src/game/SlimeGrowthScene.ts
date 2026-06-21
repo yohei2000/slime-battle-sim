@@ -140,14 +140,22 @@ export class SlimeGrowthScene extends Phaser.Scene {
 
   private layout(width: number, height: number, compact: boolean): void {
     if (compact) {
-      this.coreRect = { x: 12, y: 76, width: width - 24, height: 146 };
-      this.panelRect = { x: 12, y: 232, width: width - 24, height: 132 };
+      const shortScreen = height < 720;
+      const marginX = shortScreen ? 10 : 12;
+      const coreY = shortScreen ? 70 : 76;
+      const coreHeight = shortScreen ? 124 : 146;
+      const panelGap = shortScreen ? 8 : 10;
+      const panelHeight = shortScreen ? 112 : 132;
+      const panelY = coreY + coreHeight + panelGap;
+      const choiceY = panelY + panelHeight + panelGap;
       this.choiceRect = {
-        x: 12,
-        y: 374,
-        width: width - 24,
-        height: Math.max(0, height - 398),
+        x: marginX,
+        y: choiceY,
+        width: width - marginX * 2,
+        height: Math.max(0, height - choiceY - (shortScreen ? 14 : 24)),
       };
+      this.coreRect = { x: marginX, y: coreY, width: width - marginX * 2, height: coreHeight };
+      this.panelRect = { x: marginX, y: panelY, width: width - marginX * 2, height: panelHeight };
       return;
     }
 
@@ -336,21 +344,22 @@ export class SlimeGrowthScene extends Phaser.Scene {
 
   private drawMobileSlotStrip(): void {
     this.frame(this.coreRect, "軍制スロット");
-    const x = this.coreRect.x + 16;
-    const y = this.coreRect.y + 38;
-    const width = this.coreRect.width - 32;
+    const shortScreen = this.scale.height < 720;
+    const x = this.coreRect.x + (shortScreen ? 14 : 16);
+    const y = this.coreRect.y + (shortScreen ? 34 : 38);
+    const width = this.coreRect.width - (shortScreen ? 28 : 32);
     this.addText(x, y, `軍型: ${buildArchetype(this.growth)}`, 14, "#ffd166", 700, width);
 
     const columns = 3;
-    const gap = 7;
+    const gap = shortScreen ? 6 : 7;
     const pillWidth = (width - gap * (columns - 1)) / columns;
-    const pillHeight = 32;
-    const startY = y + 28;
+    const pillHeight = shortScreen ? 28 : 32;
+    const startY = y + (shortScreen ? 25 : 28);
     this.growth.slots.forEach((slot) => {
       const column = slot.index % columns;
       const row = Math.floor(slot.index / columns);
       const px = x + column * (pillWidth + gap);
-      const py = startY + row * (pillHeight + 7);
+      const py = startY + row * (pillHeight + (shortScreen ? 5 : 7));
       const definition = slot.skillId ? skillDefinition(slot.skillId) : undefined;
       const color = definition?.color ?? 0x2b5363;
       const fill = slot.skillId ? 0x102632 : 0x091722;
@@ -364,23 +373,25 @@ export class SlimeGrowthScene extends Phaser.Scene {
         : slot.skillId
           ? GROWTH_SLOT_ACTIVE_KEY
           : GROWTH_SLOT_EMPTY_KEY;
+      const iconFrameSize = shortScreen ? 26 : 30;
+      const iconX = px + (shortScreen ? 15 : 17);
       const slotFrame = this.add
-        .image(px + 17, py + pillHeight / 2, slotKey)
-        .setDisplaySize(30, 30)
+        .image(iconX, py + pillHeight / 2, slotKey)
+        .setDisplaySize(iconFrameSize, iconFrameSize)
         .setAlpha(slot.skillId ? 0.95 : 0.64)
         .setDepth(4);
       if (slot.skillId) {
-        this.addSkillImage(slot.skillId, px + 17, py + pillHeight / 2, 17, 0.9, 4.6);
+        this.addSkillImage(slot.skillId, iconX, py + pillHeight / 2, shortScreen ? 15 : 17, 0.9, 4.6);
       }
       const label = slot.skillId ? `${slotLabel(slot)} Lv.${slot.level}` : "空き";
       this.addText(
-        px + 37,
-        py + 8,
+        px + (shortScreen ? 33 : 37),
+        py + (shortScreen ? 6 : 8),
         label,
         12,
         definition?.accent ?? "#7f98a5",
         slot.skillId ? 700 : 500,
-        pillWidth - 44,
+        pillWidth - (shortScreen ? 38 : 44),
       ).setDepth(4);
       this.objects.push(pill, slotFrame);
     });
@@ -516,6 +527,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
     const x = this.panelRect.x + (compact ? 16 : 18);
     let y = this.panelRect.y + (compact ? 38 : 46);
     const width = this.panelRect.width - (compact ? 32 : 36);
+    const shortScreen = compact && this.scale.height < 720;
     const stats = [
       { label: "兵力", value: projection.mass.toString(), color: 0x7cecff },
       { label: "士気", value: projection.morale.toString(), color: 0xffd166 },
@@ -528,6 +540,20 @@ export class SlimeGrowthScene extends Phaser.Scene {
     ];
 
     const tightPanel = compact || this.panelRect.height < 300;
+    if (shortScreen) {
+      this.addText(
+        x,
+        this.panelRect.y + 30,
+        `${buildArchetype(this.growth)}\n` +
+          `兵力 ${projection.mass}  士気 ${projection.morale}  結束 ${projection.cohesion}\n` +
+          `疲労 ${projection.fatigue}  命令 ${projection.commandDelay.toFixed(2)}秒  突撃 ${projection.breakthroughPower}  包囲 ${projection.envelopPower}`,
+        12,
+        "#fff7df",
+        700,
+        width,
+      ).setDepth(3);
+      return;
+    }
     if (tightPanel) {
       this.addText(x, y, buildArchetype(this.growth), 17, "#ffd166", 700, width).setDepth(3);
       y += 30;
@@ -608,13 +634,14 @@ export class SlimeGrowthScene extends Phaser.Scene {
 
   private drawChoices(compact: boolean): void {
     this.frame(this.choiceRect, "軍制候補");
+    const shortScreen = compact && this.scale.height < 720;
     const x = this.choiceRect.x + (compact ? 12 : 16);
-    const y = this.choiceRect.y + (compact ? 42 : 48);
+    const y = this.choiceRect.y + (shortScreen ? 34 : compact ? 42 : 48);
     const width = this.choiceRect.width - (compact ? 24 : 32);
-    const cardGap = compact ? 10 : 14;
+    const cardGap = shortScreen ? 8 : compact ? 10 : 14;
     const cardWidth = compact ? width : (width - cardGap * 2) / 3;
     const cardHeight = compact
-      ? Math.max(88, (this.choiceRect.height - 48 - cardGap * 2) / 3)
+      ? Math.max(shortScreen ? 76 : 88, (this.choiceRect.height - (shortScreen ? 40 : 48) - cardGap * 2) / 3)
       : this.choiceRect.height - 54;
 
     this.growth.choices.forEach((choice, index) => {
@@ -630,9 +657,9 @@ export class SlimeGrowthScene extends Phaser.Scene {
 
     this.makeTokenButton(
       `再提案 ${this.growth.rerolls}`,
-      this.choiceRect.x + this.choiceRect.width - (compact ? 54 : 64),
-      this.choiceRect.y + (compact ? 23 : 25),
-      compact ? 46 : 54,
+      this.choiceRect.x + this.choiceRect.width - (shortScreen ? 48 : compact ? 54 : 64),
+      this.choiceRect.y + (shortScreen ? 20 : compact ? 23 : 25),
+      shortScreen ? 40 : compact ? 46 : 54,
       () => {
         this.growth = rerollChoices(this.growth);
         this.redraw();
@@ -650,8 +677,9 @@ export class SlimeGrowthScene extends Phaser.Scene {
     compact: boolean,
   ): void {
     const definition = skillDefinition(choice.skillId);
-    const artSize = compact ? Math.min(62, height - 20) : Math.min(104, height - 42);
-    const leftPad = compact ? 84 : 118;
+    const shortScreen = compact && this.scale.height < 720;
+    const artSize = compact ? Math.min(shortScreen ? 54 : 62, height - 20) : Math.min(104, height - 42);
+    const leftPad = compact ? (shortScreen ? 76 : 84) : 118;
     const textWidth = Math.max(116, width - leftPad - (compact ? 22 : 28));
     const textColor = "#172934";
     const mutedText = "#38515c";
@@ -679,12 +707,12 @@ export class SlimeGrowthScene extends Phaser.Scene {
       .setBlendMode(Phaser.BlendModes.ADD)
       .setDepth(3);
     const artBack = this.add
-      .circle(x + (compact ? 46 : 60), y + height / 2, artSize * 0.58, definition.color, 0.16)
+      .circle(x + (compact ? (shortScreen ? 41 : 46) : 60), y + height / 2, artSize * 0.58, definition.color, 0.16)
       .setBlendMode(Phaser.BlendModes.ADD)
       .setDepth(4.8);
     this.addSkillImage(
       choice.skillId,
-      x + (compact ? 46 : 60),
+      x + (compact ? (shortScreen ? 41 : 46) : 60),
       y + height / 2,
       artSize,
       compact ? 0.94 : 0.96,
@@ -709,11 +737,11 @@ export class SlimeGrowthScene extends Phaser.Scene {
 
     const dense = compact && height < 112;
     const textX = x + leftPad;
-    this.addText(textX, y + (compact ? 12 : 18), `${choiceKindLabel(choice)} / ${definition.organ}`, 12, definition.accent, 700, textWidth).setDepth(6);
-    this.addText(textX, y + (compact ? 31 : 42), definition.name, dense ? 15 : compact ? 16 : 18, textColor, 700, textWidth).setDepth(6);
+    this.addText(textX, y + (shortScreen ? 10 : compact ? 12 : 18), `${choiceKindLabel(choice)} / ${definition.organ}`, 12, definition.accent, 700, textWidth).setDepth(6);
+    this.addText(textX, y + (shortScreen ? 27 : compact ? 31 : 42), definition.name, dense ? (shortScreen ? 14 : 15) : compact ? 16 : 18, textColor, 700, textWidth).setDepth(6);
 
-    const lineStart = y + (compact ? (dense ? 58 : 64) : 76);
-    const lineGap = compact ? 18 : 22;
+    const lineStart = y + (shortScreen ? 52 : compact ? (dense ? 58 : 64) : 76);
+    const lineGap = shortScreen ? 16 : compact ? 18 : 22;
     this.addChoiceLine(textX, lineStart, "国家", definition.stateText, textWidth, compact, definition.accent, mutedText);
     if (dense) {
       this.addChoiceLine(textX, lineStart + lineGap, "戦場", definition.behaviorText, textWidth, compact, definition.accent, mutedText);
