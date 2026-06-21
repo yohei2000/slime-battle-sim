@@ -3,6 +3,17 @@ import { flankAccess } from "./encirclement";
 import { issueOrder } from "./slimeOrders";
 import { add, clamp, normalize, perpendicular, scale, sub } from "./vector";
 
+const ENEMY_AI_MISTAKE_RATE = 0.34;
+const ENEMY_AI_BLUNDER_RATE = 0.12;
+const ENEMY_AI_AIM_ERROR_RATIO = 0.28;
+
+type EnemyDecision = {
+  posture: SlimePosture;
+  target: Vector2Like;
+  moveScale: number;
+  wingScale: number;
+};
+
 function targetShape(enemy: ArmySlime, posture: SlimePosture) {
   if (posture === "breakthrough" || posture === "contract") {
     return { width: 188, depth: 220, density: 1.2 };
@@ -17,6 +28,73 @@ function weakPoint(player: ArmySlime, enemy: ArmySlime): Vector2Like {
   const lateral = perpendicular(player.facing);
   const side = Math.sin(enemy.center.y * 0.017) > 0 ? 1 : -1;
   return add(player.center, scale(lateral, player.currentWidth * 0.09 * side));
+}
+
+function mistakenPosture(posture: SlimePosture): SlimePosture {
+  if (posture === "breakthrough") return Math.random() < 0.55 ? "spread" : "hold";
+  if (posture === "envelop") return Math.random() < 0.55 ? "contract" : "neutral";
+  if (posture === "spread") return "contract";
+  if (posture === "contract") return "spread";
+  return posture;
+}
+
+function offsetAim(
+  target: Vector2Like,
+  player: ArmySlime,
+  enemy: ArmySlime,
+  severity: number,
+): Vector2Like {
+  const lateral = perpendicular(player.facing);
+  const direction = normalize(sub(player.center, enemy.center));
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const lateralError =
+    player.currentWidth * ENEMY_AI_AIM_ERROR_RATIO * severity * side;
+  const depthError =
+    player.currentDepth * 0.14 * severity * (Math.random() - 0.5);
+  return add(target, add(scale(lateral, lateralError), scale(direction, depthError)));
+}
+
+function applyMistake(
+  enemy: ArmySlime,
+  player: ArmySlime,
+  posture: SlimePosture,
+  target: Vector2Like,
+): EnemyDecision {
+  if (posture === "retreat") {
+    return { posture, target, moveScale: 1, wingScale: 1 };
+  }
+
+  const roll = Math.random();
+  if (roll < ENEMY_AI_BLUNDER_RATE) {
+    enemy.aiThinkAt += 1.1 + Math.random() * 1.4;
+    return {
+      posture: Math.random() < 0.55 ? "hold" : "neutral",
+      target: { ...enemy.center },
+      moveScale: 0.28,
+      wingScale: 0.18,
+    };
+  }
+
+  if (roll < ENEMY_AI_MISTAKE_RATE) {
+    enemy.aiThinkAt += 0.45 + Math.random() * 0.8;
+    const nextPosture = mistakenPosture(posture);
+    return {
+      posture: nextPosture,
+      target:
+        nextPosture === "hold" || nextPosture === "neutral"
+          ? { ...enemy.center }
+          : offsetAim(target, player, enemy, 1),
+      moveScale: 0.62,
+      wingScale: 0.52,
+    };
+  }
+
+  return {
+    posture,
+    target: Math.random() < 0.18 ? offsetAim(target, player, enemy, 0.55) : target,
+    moveScale: 1,
+    wingScale: 1,
+  };
 }
 
 export function updateEnemyAI(enemy: ArmySlime, player: ArmySlime, now: number): void {
@@ -55,23 +133,32 @@ export function updateEnemyAI(enemy: ArmySlime, player: ArmySlime, now: number):
     target = weakPoint(player, enemy);
   }
 
+  const decision = applyMistake(enemy, player, posture, target);
+  posture = decision.posture;
+  target = decision.target;
+
   const shape = targetShape(enemy, posture);
   const direction = normalize(sub(target, enemy.center));
   const moveDistance =
     posture === "retreat"
       ? 150
-      : posture === "hold"
+      : posture === "hold" || posture === "neutral"
         ? 0
         : posture === "envelop"
           ? 64
           : 92;
   const wingAdvance =
     posture === "envelop"
-      ? clamp(player.currentWidth * 0.2 + enemy.currentWidth * 0.08, 42, 118)
+      ? clamp(
+          (player.currentWidth * 0.2 + enemy.currentWidth * 0.08) *
+            decision.wingScale,
+          22,
+          118,
+        )
       : 0;
   issueOrder(enemy, {
     posture,
-    targetCenter: add(enemy.center, scale(direction, moveDistance)),
+    targetCenter: add(enemy.center, scale(direction, moveDistance * decision.moveScale)),
     targetDirection: direction,
     targetWidth: clamp(shape.width, 145, 505),
     targetDepth: clamp(shape.depth, 112, 275),
