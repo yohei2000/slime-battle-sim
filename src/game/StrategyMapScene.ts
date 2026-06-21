@@ -61,7 +61,7 @@ export class StrategyMapScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.image(STRATEGY_BACKGROUND_KEY, "assets/generated/strategy-bg-20260621b.png");
+    this.load.image(STRATEGY_BACKGROUND_KEY, "assets/generated/ai-strategy-bg-20260621.png");
   }
 
   create(): void {
@@ -119,7 +119,7 @@ export class StrategyMapScene extends Phaser.Scene {
   private addBackground(width: number, height: number): void {
     this.addCoverImage(STRATEGY_BACKGROUND_KEY, width, height, 0.92, -4);
     const graphics = this.add.graphics();
-    graphics.fillStyle(0x071118, 0.20);
+    graphics.fillStyle(0x071118, 0.12);
     graphics.fillRect(0, 0, width, height);
     graphics.lineStyle(1, 0x163342, 0.14);
     for (let x = 0; x <= width; x += 72) graphics.lineBetween(x, 0, x, height);

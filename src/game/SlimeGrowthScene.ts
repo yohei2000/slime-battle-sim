@@ -48,7 +48,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.image(GROWTH_BACKGROUND_KEY, "assets/generated/growth-bg-20260621b.png");
+    this.load.image(GROWTH_BACKGROUND_KEY, "assets/generated/ai-growth-bg-20260621.png");
     SKILL_DEFINITIONS.forEach((definition) => {
       this.load.image(definition.artKey, `assets/generated/${definition.artKey}.png`);
     });
@@ -156,7 +156,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
   private addBackground(width: number, height: number): void {
     this.addCoverImage(GROWTH_BACKGROUND_KEY, width, height, 0.95, -4);
     const graphics = this.add.graphics();
-    graphics.fillStyle(0x071118, 0.18);
+    graphics.fillStyle(0x071118, 0.1);
     graphics.fillRect(0, 0, width, height);
     graphics.lineStyle(1, 0x163342, 0.16);
     for (let x = 0; x <= width; x += 64) graphics.lineBetween(x, 0, x, height);
@@ -588,7 +588,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
     const artSize = compact ? Math.min(58, height - 12) : Math.min(118, height - 28);
     const textWidth = Math.max(96, width - artSize - (compact ? 44 : 72));
     const background = this.add
-      .rectangle(x, y, width, height, 0x102632, 0.82)
+      .rectangle(x, y, width, height, 0x102632, 0.76)
       .setOrigin(0)
       .setStrokeStyle(choice.kind === "evolve" ? 3 : 2, choice.kind === "evolve" ? 0xffd166 : definition.color, 0.82)
       .setInteractive({ useHandCursor: true })
@@ -634,7 +634,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
       ease: "Sine.easeInOut",
     });
     background.on("pointerdown", () => background.setFillStyle(0x183b4a, 0.92));
-    background.on("pointerout", () => background.setFillStyle(0x102632, 0.82));
+    background.on("pointerout", () => background.setFillStyle(0x102632, 0.76));
     background.on("pointerup", () => {
       this.growth = applySkillChoice(this.growth, choice.skillId);
       this.redraw();
@@ -672,7 +672,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
 
   private frame(rect: Rect, title: string): void {
     const frame = this.add
-      .rectangle(rect.x, rect.y, rect.width, rect.height, 0x0a1a23, 0.74)
+      .rectangle(rect.x, rect.y, rect.width, rect.height, 0x0a1a23, 0.66)
       .setOrigin(0)
       .setStrokeStyle(2, 0x2b5363, 0.86);
     this.objects.push(frame);
