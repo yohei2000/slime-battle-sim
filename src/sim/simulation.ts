@@ -1,13 +1,13 @@
 import type { BattleState } from "./types";
 import { createArmySlime } from "./slime";
 import { updateOrder } from "./slimeOrders";
-import { updateSlime } from "./slimePhysics";
+import { enforceZocExclusion, updateSlime } from "./slimePhysics";
 import { resolveCombat } from "./slimeCombat";
 import { updateEncirclement } from "./encirclement";
 import { updateEnemyAI } from "./enemyAI";
 import { splitArmySlime, shouldSplitSlime, updateSplitStress } from "./slimeSplit";
 import { updateRoutingState } from "./routing";
-import { distance } from "./vector";
+import { average, distance, scale, sub } from "./vector";
 import type { ArmySlime } from "./types";
 
 export class BattleSimulation {
@@ -82,6 +82,7 @@ export class BattleSimulation {
       const player = this.nearest(enemy, players);
       if (player) updateSlime(enemy, player, dt, this.bounds);
     }
+    this.enforceZocOwnership(players, enemies, dt);
 
     if (!isResolved) {
       for (const player of players) {
@@ -135,6 +136,26 @@ export class BattleSimulation {
       }
     }
     return result;
+  }
+
+  private enforceZocOwnership(
+    players: ArmySlime[],
+    enemies: ArmySlime[],
+    dt: number,
+  ): void {
+    for (let pass = 0; pass < 2; pass += 1) {
+      for (const player of players) {
+        for (const enemy of enemies) {
+          enforceZocExclusion(player, enemy, true);
+          enforceZocExclusion(enemy, player, true);
+        }
+      }
+    }
+    for (const slime of [...players, ...enemies]) {
+      const nextCenter = average(slime.nodes.map((node) => node.position));
+      slime.velocity = scale(sub(nextCenter, slime.center), 1 / Math.max(dt, 0.001));
+      slime.center = nextCenter;
+    }
   }
 
   private sideCanStillFight(slimes: ArmySlime[]): boolean {

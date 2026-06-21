@@ -1,4 +1,4 @@
-import type { ArmySlime, SlimeNode, Vector2Like } from "./types";
+import type { ArmySlime, SlimeNode, SlimeParticle, Vector2Like } from "./types";
 import {
   add,
   average,
@@ -351,25 +351,31 @@ function applyTerrainForces(slime: ArmySlime, forces: ForceMap, bounds: { width:
   }
 }
 
-function enforceZocBoundary(slime: ArmySlime, enemy: ArmySlime): void {
+export function enforceZocExclusion(
+  slime: ArmySlime,
+  enemy: ArmySlime,
+  includeParticles = false,
+): void {
   const contactNormals: Vector2Like[] = [];
-  const clearanceScale = getMutualZocClearanceScale(enemy, slime);
-  for (const node of slime.nodes.filter((candidate) => candidate.role !== "interior")) {
+  const boundaryClearanceScale = getMutualZocClearanceScale(enemy, slime);
+  let movedNode = false;
+  for (const node of slime.nodes) {
+    const isBoundary = node.role !== "interior";
+    const clearanceScale = isBoundary ? boundaryClearanceScale : 1.08;
     const sample = sampleEnemyZoc(enemy, node.position, clearanceScale);
     if (!sample.insideZoc) continue;
 
     contactNormals.push(sample.outwardNormal);
-    const correctionLimit = clamp(
-      34 + Math.max(0, sample.penetration) * 0.95,
-      34,
-      82,
-    );
+    const correctionLimit = isBoundary
+      ? clamp(34 + Math.max(0, sample.penetration) * 0.95, 34, 82)
+      : clamp(18 + Math.max(0, sample.penetration) * 0.75, 18, 58);
     node.position = projectOutsideEnemyZoc(
       enemy,
       node.position,
       clearanceScale,
       correctionLimit,
     );
+    movedNode = true;
     const normalVelocity = dot(node.velocity, sample.outwardNormal);
     const tangentVelocity = sub(
       node.velocity,
@@ -377,9 +383,14 @@ function enforceZocBoundary(slime: ArmySlime, enemy: ArmySlime): void {
     );
     const outwardVelocity =
       normalVelocity > 0 ? scale(sample.outwardNormal, normalVelocity * 0.35) : { x: 0, y: 0 };
-    node.velocity = add(scale(tangentVelocity, 0.9), outwardVelocity);
+    node.velocity = add(
+      scale(tangentVelocity, isBoundary ? 0.9 : 0.62),
+      outwardVelocity,
+    );
     node.localPressure = clamp(
-      node.localPressure + Math.max(0, sample.penetration) * 1.1 + 5,
+      node.localPressure +
+        Math.max(0, sample.penetration) * (isBoundary ? 1.1 : 0.72) +
+        (isBoundary ? 5 : 2.5),
       0,
       100,
     );
@@ -397,6 +408,39 @@ function enforceZocBoundary(slime: ArmySlime, enemy: ArmySlime): void {
       );
     }
   }
+
+  if (includeParticles) {
+    for (const particle of slime.particles) {
+      constrainParticleOutsideEnemyZoc(particle, enemy);
+    }
+  }
+  if (movedNode) invalidateZocBoundaryCache(slime);
+}
+
+function constrainParticleOutsideEnemyZoc(
+  particle: SlimeParticle,
+  enemy: ArmySlime,
+): void {
+  if (!particle.alive) return;
+  const zocSample = sampleEnemyZoc(enemy, particle.position, 1.04);
+  if (!zocSample.insideZoc) return;
+  const correctionLimit = clamp(
+    16 + Math.max(0, zocSample.penetration) * 0.8,
+    16,
+    48,
+  );
+  particle.position = projectOutsideEnemyZoc(
+    enemy,
+    particle.position,
+    1.04,
+    correctionLimit,
+  );
+  const normalVelocity = dot(particle.velocity, zocSample.outwardNormal);
+  const tangentVelocity = sub(
+    particle.velocity,
+    scale(zocSample.outwardNormal, normalVelocity),
+  );
+  particle.velocity = scale(tangentVelocity, 0.72);
 }
 
 function enforceCohesionEnvelope(slime: ArmySlime): void {
@@ -459,7 +503,7 @@ function integrateNodes(
     if (speed > 88) node.velocity = scale(node.velocity, 88 / speed);
     node.position = add(node.position, scale(node.velocity, dt));
   }
-  enforceZocBoundary(slime, enemy);
+  enforceZocExclusion(slime, enemy);
   enforceCohesionEnvelope(slime);
   enforceWorldBoundary(slime, bounds);
   const nextCenter = average(slime.nodes.map((node) => node.position));
@@ -467,7 +511,7 @@ function integrateNodes(
   slime.center = nextCenter;
 }
 
-function updateParticles(slime: ArmySlime, dt: number): void {
+function updateParticles(slime: ArmySlime, enemy: ArmySlime, dt: number): void {
   const byId = new Map(slime.nodes.map((node) => [node.id, node]));
   const direction = normalize(slime.facing);
   const lateral = perpendicular(direction);
@@ -483,6 +527,7 @@ function updateParticles(slime: ArmySlime, dt: number): void {
     const desired = add(target, wander);
     particle.velocity = add(scale(particle.velocity, 0.84), scale(sub(desired, particle.position), 0.09));
     particle.position = add(particle.position, scale(particle.velocity, dt * 3.5));
+    constrainParticleOutsideEnemyZoc(particle, enemy);
   }
 }
 
@@ -581,7 +626,7 @@ export function updateSlime(
   applyZocForces(slime, enemy, forces);
   applyTerrainForces(slime, forces, bounds);
   integrateNodes(slime, enemy, forces, dt, bounds);
-  updateParticles(slime, dt);
+  updateParticles(slime, enemy, dt);
   updateDerivedStats(slime, dt);
   invalidateZocBoundaryCache(slime);
 }
