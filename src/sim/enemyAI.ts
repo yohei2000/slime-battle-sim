@@ -5,10 +5,10 @@ import { add, clamp, normalize, perpendicular, scale, sub } from "./vector";
 
 function targetShape(enemy: ArmySlime, posture: SlimePosture) {
   if (posture === "breakthrough" || posture === "contract") {
-    return { width: 170, depth: 245, density: 1.42 };
+    return { width: 172, depth: 235, density: 1.35 };
   }
   if (posture === "spread" || posture === "envelop") {
-    return { width: 390, depth: 128, density: 0.76 };
+    return { width: 440, depth: 132, density: 0.72 };
   }
   return { width: 250, depth: 180, density: 1 };
 }
@@ -34,32 +34,47 @@ export function updateEnemyAI(enemy: ArmySlime, player: ArmySlime, now: number):
   } else if (enemy.isEncircled) {
     posture = "breakthrough";
     target = weakPoint(player, enemy);
-  } else if (player.gapRisk > 0.48) {
+  } else if (player.gapRisk > 0.64 && player.envelopPower < 0.58) {
     posture = "breakthrough";
     target = weakPoint(player, enemy);
-  } else if (player.currentDensity > 1.23 && access > 0.18) {
+  } else if (player.currentDensity > 1.12 && access > 0.12) {
     posture = "envelop";
-  } else if (enemy.morale > player.morale + 8 && player.morale < 48) {
+  } else if (enemy.morale > player.morale + 6 && player.morale < 56) {
     posture = "envelop";
   } else if (enemy.fatigue > 68) {
     posture = "hold";
     target = enemy.center;
   } else {
-    posture = Math.random() > 0.56 ? "spread" : "contract";
+    posture =
+      access > 0.08 || player.currentDensity > 1.02 || Math.random() > 0.34
+        ? "envelop"
+        : "breakthrough";
+    if (posture === "breakthrough") target = weakPoint(player, enemy);
   }
 
   const shape = targetShape(enemy, posture);
   const direction = normalize(sub(target, enemy.center));
-  const moveDistance = posture === "retreat" ? 150 : posture === "hold" ? 0 : 100;
+  const moveDistance =
+    posture === "retreat"
+      ? 150
+      : posture === "hold"
+        ? 0
+        : posture === "envelop"
+          ? 86
+          : 118;
+  const wingAdvance =
+    posture === "envelop"
+      ? clamp(player.currentWidth * 0.28 + enemy.currentWidth * 0.12, 75, 165)
+      : 0;
   issueOrder(enemy, {
     posture,
     targetCenter: add(enemy.center, scale(direction, moveDistance)),
     targetDirection: direction,
-    targetWidth: clamp(shape.width, 145, 430),
+    targetWidth: clamp(shape.width, 145, 505),
     targetDepth: clamp(shape.depth, 112, 275),
     targetDensity: shape.density,
-    targetLeftWingAdvance: 0,
-    targetRightWingAdvance: 0,
+    targetLeftWingAdvance: wingAdvance,
+    targetRightWingAdvance: wingAdvance,
     issuedAt: now,
   });
 }

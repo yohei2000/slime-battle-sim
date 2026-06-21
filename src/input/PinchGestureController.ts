@@ -116,22 +116,34 @@ export class PinchGestureController {
 
     const isAdvance =
       this.gesture === "breakthrough" || this.gesture === "envelop-advance";
+    const envelopAdvance =
+      this.gesture === "envelop-advance"
+        ? clamp(Math.max(70, forwardMotion * 0.82), 70, 175)
+        : 0;
     const width =
       this.gesture === "rotate" ||
       this.gesture === "left-wing" ||
       this.gesture === "right-wing"
         ? slime.desiredWidth
-        : clamp(slime.currentWidth * this.scaleValue, 145, 450);
+        : this.gesture === "envelop-advance"
+          ? clamp(slime.currentWidth * this.scaleValue * 1.12, 185, 520)
+          : clamp(slime.currentWidth * this.scaleValue, 145, 450);
     const depth =
       this.gesture === "rotate" ||
       this.gesture === "left-wing" ||
       this.gesture === "right-wing"
         ? slime.desiredDepth
-        : clamp(
-            slime.currentDepth / Math.pow(this.scaleValue, 0.72),
-            110,
-            290,
-          );
+        : this.gesture === "envelop-advance"
+          ? clamp(
+              slime.currentDepth / Math.pow(this.scaleValue, 0.54),
+              118,
+              255,
+            )
+          : clamp(
+              slime.currentDepth / Math.pow(this.scaleValue, 0.72),
+              110,
+              290,
+            );
     const targetDirection =
       this.gesture === "rotate"
         ? rotate(slime.facing, this.rotation)
@@ -143,7 +155,10 @@ export class PinchGestureController {
           slime.center,
           scale(
             targetDirection,
-            Math.min(240, Math.max(70, forwardMotion * 1.55)),
+            Math.min(
+              this.gesture === "envelop-advance" ? 190 : 240,
+              Math.max(70, forwardMotion * (this.gesture === "envelop-advance" ? 1.18 : 1.55)),
+            ),
           ),
         )
       : slime.desiredCenter;
@@ -167,8 +182,8 @@ export class PinchGestureController {
       targetWidth: width,
       targetDepth: depth,
       targetDensity: clamp((250 * 180) / (width * depth), 0.62, 1.65),
-      targetLeftWingAdvance: this.leftWingAdvance,
-      targetRightWingAdvance: this.rightWingAdvance,
+      targetLeftWingAdvance: this.leftWingAdvance + envelopAdvance,
+      targetRightWingAdvance: this.rightWingAdvance + envelopAdvance,
       issuedAt: now,
     });
     this.reset();

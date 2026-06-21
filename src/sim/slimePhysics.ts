@@ -27,38 +27,73 @@ function addForce(forces: ForceMap, node: SlimeNode, force: Vector2Like): void {
   forces.set(node.id, add(forces.get(node.id) ?? { x: 0, y: 0 }, force));
 }
 
-function updateDesiredShape(slime: ArmySlime): void {
+function updateDesiredShape(slime: ArmySlime, enemy: ArmySlime): void {
   const direction = normalize(slime.desiredDirection);
   const lateral = perpendicular(direction);
-  const wingCurve = slime.posture === "envelop" ? 0.34 : 0;
+  const wingCurve = slime.posture === "envelop" ? 0.62 : 0;
+  const autoWingAdvance =
+    slime.posture === "envelop"
+      ? Math.max(
+          slime.desiredDepth * 0.58,
+          Math.min(170, enemy.currentWidth * 0.34 + slime.zocRadius * 0.55),
+        )
+      : 0;
 
   slime.nodes.forEach((node) => {
     let forward = node.shapeU * slime.desiredDepth * 0.5;
-    const sideways = node.shapeV * slime.desiredWidth * 0.5;
+    let sideways = node.shapeV * slime.desiredWidth * 0.5;
     const leftWeight = clamp01(node.shapeV);
     const rightWeight = clamp01(-node.shapeV);
     const wingFrontBias = 0.35 + Math.max(0, node.shapeU) * 0.65;
     forward +=
-      (slime.desiredLeftWingAdvance * leftWeight +
-        slime.desiredRightWingAdvance * rightWeight) *
+      ((slime.desiredLeftWingAdvance + autoWingAdvance) * leftWeight +
+        (slime.desiredRightWingAdvance + autoWingAdvance) * rightWeight) *
       wingFrontBias;
     if (slime.posture === "envelop") {
       forward += Math.abs(node.shapeV) * slime.desiredDepth * wingCurve;
+      const curlWeight =
+        clamp01(Math.abs(node.shapeV)) *
+        clamp01((node.shapeU + 0.2) / 1.2);
+      sideways *= 1 - curlWeight * 0.24;
     }
     if (slime.posture === "breakthrough" && node.shapeU > 0.45) {
       forward +=
         slime.desiredDepth * 0.2 * clamp01((node.shapeU - 0.45) / 0.55);
     }
-    node.targetPosition = add(
+    let target = add(
       slime.desiredCenter,
       add(scale(direction, forward), scale(lateral, sideways)),
     );
+    if (slime.posture === "envelop" && Math.abs(node.shapeV) > 0.28) {
+      const sideSign = node.shapeV >= 0 ? 1 : -1;
+      const wingWeight = clamp01(Math.abs(node.shapeV));
+      const frontWeight = clamp01((node.shapeU + 0.15) / 1.15);
+      const wrapPoint = add(
+        enemy.center,
+        add(
+          scale(direction, enemy.currentDepth * (0.18 + frontWeight * 0.18)),
+          scale(
+            lateral,
+            sideSign * (enemy.currentWidth * 0.48 + slime.zocRadius * 0.62),
+          ),
+        ),
+      );
+      target = lerp(target, wrapPoint, wingWeight * frontWeight * 0.38);
+    }
+    node.targetPosition = target;
   });
 }
 
 function applyOrderForces(slime: ArmySlime, forces: ForceMap): void {
   const flow = sub(slime.desiredCenter, slime.center);
-  const flowSpeed = Math.min(length(flow), slime.posture === "breakthrough" ? 92 : 58);
+  const flowSpeed = Math.min(
+    length(flow),
+    slime.posture === "breakthrough"
+      ? 76
+      : slime.posture === "envelop"
+        ? 68
+        : 58,
+  );
   const flowForce = scale(normalize(flow), flowSpeed * 0.017);
   for (const node of slime.nodes) {
     const shapeForce = scale(sub(node.targetPosition, node.position), 0.036 * slime.elasticity);
@@ -430,27 +465,45 @@ function updateDerivedStats(slime: ArmySlime, dt: number): void {
   slime.crowding = Math.max(0, slime.currentDensity / 1.22 - 1);
   if (slime.crowding > 0) {
     const compactPosturePenalty =
-      slime.posture === "contract" || slime.posture === "breakthrough" ? 1.55 : 1;
+      slime.posture === "breakthrough"
+        ? 2.1
+        : slime.posture === "contract"
+          ? 1.55
+          : 1;
     slime.fatigue += slime.crowding * 6.8 * compactPosturePenalty * dt;
     slime.cohesion -= slime.crowding * 7.5 * compactPosturePenalty * dt;
+  }
+  if (slime.posture === "breakthrough") {
+    const breakthroughLoad = slime.isEngaged ? 1.55 : 0.85;
+    slime.fatigue += (0.95 + slime.crowding * 3.2) * breakthroughLoad * dt;
+    slime.cohesion -= (0.44 + slime.crowding * 2.15) * breakthroughLoad * dt;
   }
   slime.breakthroughPower = clamp01(
     slime.currentDensity * 0.25 +
       slime.morale / 330 +
       slime.cohesion / 420 +
-      (slime.posture === "breakthrough" ? 0.17 : 0) -
-      slime.crowding * 0.12,
+      (slime.posture === "breakthrough" ? 0.11 : 0) -
+      slime.crowding * 0.2 -
+      slime.fatigue / 420,
   );
   slime.envelopPower = clamp01(
-    slime.currentWidth / 470 +
+    slime.currentWidth / 420 +
       slime.zocRadius / 190 +
-      slime.cohesion / 420 -
-      slime.gapRisk * 0.18,
+      slime.cohesion / 390 +
+      (slime.posture === "envelop" ? 0.1 : 0) -
+      slime.gapRisk * 0.14,
   );
   slime.pressure = clamp(slime.pressure - (slime.isEngaged ? 0.5 : 7) * dt, 0, 100);
   slime.fatigue = clamp(slime.fatigue - (slime.isEngaged || slime.posture === "breakthrough" ? 0 : 0.7) * dt, 0, 100);
   slime.cohesion = clamp(slime.cohesion + (!slime.isEngaged && slime.crowding < 0.05 ? 0.45 * dt : 0), 0, 100);
-  slime.morale = clamp(slime.morale + (!slime.isEngaged && !slime.isEncircled ? 0.22 * dt : 0), 0, 100);
+  slime.morale = clamp(
+    slime.morale +
+      (!slime.isEngaged && !slime.isEncircled && slime.encirclement < 0.24
+        ? 0.22 * dt
+        : 0),
+    0,
+    100,
+  );
   slime.shockTimer = Math.max(0, slime.shockTimer - dt);
   slime.facing = normalize(lerp(slime.facing, slime.desiredDirection, clamp01(dt * 2.2)));
   for (const node of slime.nodes) {
@@ -468,7 +521,7 @@ export function updateSlime(
   dt: number,
   bounds: { width: number; height: number },
 ): void {
-  updateDesiredShape(slime);
+  updateDesiredShape(slime, enemy);
   const forces: ForceMap = new Map();
   applyOrderForces(slime, forces);
   applySpringForces(slime, enemy, forces, dt);

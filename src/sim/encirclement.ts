@@ -1,5 +1,5 @@
 import type { ArmySlime } from "./types";
-import { clamp01, distance, dot, normalize, sub } from "./vector";
+import { clamp, clamp01, distance, dot, normalize, sub } from "./vector";
 import { zocContinuity } from "./zoc";
 
 export function ringIntegrity(slime: ArmySlime): number {
@@ -26,19 +26,63 @@ export function flankAccess(attacker: ArmySlime, defender: ArmySlime): number {
 
 export function updateEncirclement(attacker: ArmySlime, defender: ArmySlime, dt: number): void {
   const range = distance(attacker.center, defender.center);
-  const reach = attacker.currentWidth * 0.6 + defender.currentWidth * 0.28;
-  const postureBonus = attacker.posture === "envelop" ? 0.75 : attacker.posture === "spread" ? 0.38 : 0;
+  const reach = attacker.currentWidth * 0.68 + defender.currentWidth * 0.32;
+  const postureBonus = attacker.posture === "envelop" ? 1.08 : attacker.posture === "spread" ? 0.36 : 0;
   const access = flankAccess(attacker, defender);
   const integrity = ringIntegrity(attacker);
-  const gain = range < reach + 130 ? postureBonus * access * integrity * 0.16 : 0;
-  defender.encirclement = clamp01(defender.encirclement + gain * dt - (gain === 0 ? 0.045 * dt : 0));
-  defender.isEncircled = defender.encirclement > 0.62;
-  attacker.isEncircling = defender.encirclement > 0.22;
+  const widthCoverage = clamp01(
+    (attacker.currentWidth - defender.currentWidth * 0.72) /
+      Math.max(95, defender.currentWidth * 0.8),
+  );
+  const wingAdvance = clamp01(
+    (attacker.desiredLeftWingAdvance + attacker.desiredRightWingAdvance) /
+      Math.max(130, attacker.currentDepth * 1.1),
+  );
+  const contactGrip = clamp01(
+    Math.max(...attacker.contactPatches.map((patch) => patch.ownFrontage), 0) *
+      1.35,
+  );
+  const wrapAccess = Math.max(access, widthCoverage * 0.62);
+  const wrapMotion = 0.72 + wingAdvance * 0.42 + contactGrip * 0.22;
+  const gain =
+    range < reach + 165
+      ? postureBonus * wrapAccess * integrity * wrapMotion * 0.27
+      : 0;
+  defender.encirclement = clamp01(
+    defender.encirclement + gain * dt - (gain === 0 ? 0.032 * dt : 0),
+  );
+  defender.isEncircled = defender.encirclement > 0.56;
+  attacker.isEncircling = defender.encirclement > 0.16;
 
-  if (defender.encirclement > 0.35) {
-    defender.morale -= defender.encirclement * 1.2 * dt;
-    defender.fatigue += defender.encirclement * 0.8 * dt;
-    defender.commandDelay += defender.encirclement * 0.04 * dt;
+  if (defender.encirclement > 0.22) {
+    const pressure = defender.encirclement;
+    defender.morale = clamp(
+      defender.morale - pressure * (defender.isEncircled ? 2.8 : 1.85) * dt,
+      0,
+      100,
+    );
+    defender.fatigue = clamp(
+      defender.fatigue + pressure * (defender.isEncircled ? 2.25 : 1.35) * dt,
+      0,
+      100,
+    );
+    defender.pressure = clamp(
+      defender.pressure + pressure * (defender.isEncircled ? 3.2 : 1.6) * dt,
+      0,
+      100,
+    );
+    defender.commandDelay = clamp(
+      defender.commandDelay + pressure * 0.13 * dt,
+      0,
+      5,
+    );
+    if (defender.encirclement > 0.48) {
+      defender.cohesion = clamp(
+        defender.cohesion - (defender.encirclement - 0.38) * 2.1 * dt,
+        0,
+        100,
+      );
+    }
   }
 }
 

@@ -114,6 +114,13 @@ export class MobileHUD {
     if (player.crowding > 0.18) warnings.push("過密継続");
     if (player.isEncircling && ringIntegrity(player) < 0.46) warnings.push("包囲線が薄い");
     if (player.isEncircled) warnings.push("包囲されています");
+    if (enemy.encirclement > 0.16) {
+      warnings.push(
+        `包囲圧 ${(enemy.encirclement * 100).toFixed(0)}%: 敵士気/指揮を削る`,
+      );
+    }
+    if (enemy.encirclement > 0.34) warnings.push("包囲効果: 敵の士気回復停止");
+    if (enemy.isEncircled) warnings.push("包囲成立: 敵が崩れやすい");
     if (player.activeOrder?.status === "transmitting") warnings.push("命令伝達中");
     if (player.isRouting) warnings.push("士気崩壊：敗走中");
     if (player.peakLocalStress > player.effectiveToughness)

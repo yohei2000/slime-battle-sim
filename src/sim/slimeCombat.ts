@@ -71,17 +71,21 @@ function combatPower(slime: ArmySlime, patch: ContactPatch, own: boolean): numbe
     slime.isRouting
       ? 0.42
       : slime.posture === "breakthrough"
-      ? 1.26
+      ? 1.14
       : slime.posture === "envelop"
-        ? 1.13
+        ? 1.18
         : slime.posture === "contract"
           ? 1.04
           : slime.posture === "spread"
             ? 0.94
             : 1;
-  const shock = slime.shockTimer > 0 ? 1.25 : 1;
+  const shock = slime.shockTimer > 0 ? 1.16 : 1;
   const crowdingEfficiency =
     slime.currentDensity > 1.24 ? 1 - clamp01((slime.currentDensity - 1.24) / 0.58) * 0.22 : 1;
+  const encirclementPenalty =
+    slime.encirclement > 0
+      ? 1 - clamp01(slime.encirclement) * (slime.isEncircled ? 0.34 : 0.22)
+      : 1;
   return (
     activePower *
     density *
@@ -90,6 +94,7 @@ function combatPower(slime: ArmySlime, patch: ContactPatch, own: boolean): numbe
     postureFactor *
     shock *
     crowdingEfficiency *
+    encirclementPenalty *
     (1 - slime.fatigue / 155)
   );
 }
@@ -113,23 +118,23 @@ export function resolveCombat(own: ArmySlime, enemy: ArmySlime, dt: number): voi
     if (own.posture === "breakthrough" && enemy.encirclement > 0.3) {
       const breakoutPower =
         own.currentDensity *
-        (own.shockTimer > 0 ? 1.5 : 1.1) *
+        (own.shockTimer > 0 ? 1.32 : 1.02) *
         (own.morale / 100) *
         (own.cohesion / 100) *
-        1.12 *
-        1.35;
+        1.06 *
+        1.18;
       const containmentPower =
         enemy.currentDensity *
         enemy.zocStrength *
         (enemy.cohesion / 100) *
         ringIntegrity(enemy) *
-        1;
+        (1 + enemy.envelopPower * 0.22);
       if (breakoutPower > containmentPower) {
-        own.encirclement = clamp01(own.encirclement - 0.28 * dt);
+        own.encirclement = clamp01(own.encirclement - 0.2 * dt);
       } else {
-        own.fatigue = clamp(own.fatigue + 3.4 * dt, 0, 100);
-        own.cohesion = clamp(own.cohesion - 2.6 * dt, 0, 100);
-        own.morale = clamp(own.morale - 1.8 * dt, 0, 100);
+        own.fatigue = clamp(own.fatigue + 4.2 * dt, 0, 100);
+        own.cohesion = clamp(own.cohesion - 3.2 * dt, 0, 100);
+        own.morale = clamp(own.morale - 2.25 * dt, 0, 100);
       }
     }
   }
@@ -138,8 +143,11 @@ export function resolveCombat(own: ArmySlime, enemy: ArmySlime, dt: number): voi
 export function contactPushForce(own: ArmySlime, enemy: ArmySlime, node: SlimeNode) {
   const patch = own.contactPatches[0];
   if (!patch || !patch.ownNodeIds.includes(node.id)) return { x: 0, y: 0 };
-  const ownPower = own.breakthroughPower * (own.posture === "breakthrough" ? 1.6 : 1);
-  const enemyContainment = enemy.zocStrength * (0.65 + enemy.currentDensity * 0.35);
+  const ownPower = own.breakthroughPower * (own.posture === "breakthrough" ? 1.24 : 1);
+  const enemyContainment =
+    enemy.zocStrength *
+    (0.65 + enemy.currentDensity * 0.35) *
+    (1 + enemy.envelopPower * (enemy.posture === "envelop" ? 0.22 : 0.08));
   return scale(
     normalize(sub(own.center, enemy.center)),
     Math.max(0, enemyContainment - ownPower * 0.75) * patch.pressure * 0.0065,

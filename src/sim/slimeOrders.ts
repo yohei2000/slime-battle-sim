@@ -62,12 +62,17 @@ export function updateOrder(slime: ArmySlime, now: number): void {
       slime.desiredLeftWingAdvance = order.targetLeftWingAdvance;
     if (order.targetRightWingAdvance !== undefined)
       slime.desiredRightWingAdvance = order.targetRightWingAdvance;
-    if (order.posture === "breakthrough") slime.shockTimer = 2.4;
+    if (order.posture === "breakthrough") slime.shockTimer = 1.75;
   }
 
   if (
     order.status === "executing" &&
-    now - order.executeAt > (order.posture === "breakthrough" ? 2.5 : 0.8)
+    now - order.executeAt >
+      (order.posture === "breakthrough"
+        ? 2.1
+        : order.posture === "envelop"
+          ? 1.65
+          : 0.8)
   ) {
     order.status = "completed";
     slime.activeOrder = undefined;
