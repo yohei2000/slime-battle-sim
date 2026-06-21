@@ -23,6 +23,8 @@ type BoundaryCacheEntry = {
 };
 
 const boundaryCache = new WeakMap<ArmySlime, BoundaryCacheEntry>();
+const ZOC_CURVE_SAMPLES_PER_EDGE = 3;
+const ZOC_CURVE_TENSION = 0.42;
 
 function boundaryNodes(slime: ArmySlime): SlimeNode[] {
   return slime.nodes.filter((node) => node.role !== "interior");
@@ -38,15 +40,54 @@ function sortedBoundary(slime: ArmySlime, nodes: SlimeNode[]): SlimeNode[] {
   );
 }
 
-function ringSegments(nodes: SlimeNode[]): ZocFieldSegment[] {
-  if (nodes.length < 2) return [];
+function cardinalClosedPoint(
+  p0: Vector2Like,
+  p1: Vector2Like,
+  p2: Vector2Like,
+  p3: Vector2Like,
+  t: number,
+): Vector2Like {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  const m1 = scale(sub(p2, p0), ZOC_CURVE_TENSION);
+  const m2 = scale(sub(p3, p1), ZOC_CURVE_TENSION);
+  const h00 = 2 * t3 - 3 * t2 + 1;
+  const h10 = t3 - 2 * t2 + t;
+  const h01 = -2 * t3 + 3 * t2;
+  const h11 = t3 - t2;
+  return add(
+    add(scale(p1, h00), scale(m1, h10)),
+    add(scale(p2, h01), scale(m2, h11)),
+  );
+}
+
+function curvedClosedBoundaryPoints(nodes: SlimeNode[]): Vector2Like[] {
+  if (nodes.length < 3) return nodes.map((node) => ({ ...node.position }));
+  const points = nodes.map((node) => node.position);
+  const curved: Vector2Like[] = [];
+  for (let i = 0; i < points.length; i += 1) {
+    const p0 = points[(i - 1 + points.length) % points.length];
+    const p1 = points[i];
+    const p2 = points[(i + 1) % points.length];
+    const p3 = points[(i + 2) % points.length];
+    for (let step = 0; step < ZOC_CURVE_SAMPLES_PER_EDGE; step += 1) {
+      curved.push(
+        cardinalClosedPoint(p0, p1, p2, p3, step / ZOC_CURVE_SAMPLES_PER_EDGE),
+      );
+    }
+  }
+  return curved;
+}
+
+function ringSegments(points: Vector2Like[]): ZocFieldSegment[] {
+  if (points.length < 2) return [];
   const segments: ZocFieldSegment[] = [];
-  for (let i = 0; i < nodes.length; i += 1) {
-    const a = nodes[i];
-    const b = nodes[(i + 1) % nodes.length];
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
     segments.push({
-      start: { ...a.position },
-      end: { ...b.position },
+      start: { ...a },
+      end: { ...b },
     });
   }
   return segments;
@@ -58,12 +99,10 @@ function cachedBoundary(slime: ArmySlime): BoundaryCacheEntry {
 
   const nodes = boundaryNodes(slime);
   const sortedNodes = sortedBoundary(slime, nodes);
-  const bodyPoints = sortedNodes.map((node) => ({
-    ...node.position,
-  }));
+  const bodyPoints = curvedClosedBoundaryPoints(sortedNodes);
   const entry: BoundaryCacheEntry = {
     bodyPoints,
-    zocSegments: ringSegments(sortedNodes),
+    zocSegments: ringSegments(bodyPoints),
   };
   boundaryCache.set(slime, entry);
   return entry;
