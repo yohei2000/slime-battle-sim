@@ -25,6 +25,17 @@ type TextButton = {
 };
 
 const GROWTH_BACKGROUND_KEY = "growth-generated-background";
+const GROWTH_ASSET_VERSION = "20260622a";
+const GROWTH_COMMAND_CORE_KEY = "growth-command-core";
+const GROWTH_SLOT_EMPTY_KEY = "growth-slot-empty";
+const GROWTH_SLOT_ACTIVE_KEY = "growth-slot-active";
+const GROWTH_SLOT_EVOLVED_KEY = "growth-slot-evolved";
+const GROWTH_GENERATED_KEYS = [
+  GROWTH_COMMAND_CORE_KEY,
+  GROWTH_SLOT_EMPTY_KEY,
+  GROWTH_SLOT_ACTIVE_KEY,
+  GROWTH_SLOT_EVOLVED_KEY,
+];
 
 export class SlimeGrowthScene extends Phaser.Scene {
   private growth: SlimeGrowthState = createInitialGrowthState();
@@ -49,6 +60,9 @@ export class SlimeGrowthScene extends Phaser.Scene {
 
   preload(): void {
     this.load.image(GROWTH_BACKGROUND_KEY, "assets/generated/ai-growth-bg-20260621.png");
+    GROWTH_GENERATED_KEYS.forEach((key) => {
+      this.load.image(key, `assets/generated/${key}-${GROWTH_ASSET_VERSION}.png`);
+    });
     SKILL_DEFINITIONS.forEach((definition) => {
       this.load.image(definition.artKey, `assets/generated/${definition.artKey}.png`);
     });
@@ -265,14 +279,12 @@ export class SlimeGrowthScene extends Phaser.Scene {
     this.animatedCoreCenter = center;
     this.animatedCoreRadius = radius;
 
-    graphics.fillStyle(0x0b2230, 0.78);
-    graphics.fillEllipse(center.x, center.y, radius * 2.18, radius * 1.66);
-    graphics.lineStyle(3, 0x7cecff, 0.28);
-    graphics.strokeEllipse(center.x, center.y, radius * 2.18, radius * 1.66);
-    graphics.lineStyle(2, 0x9aff9f, 0.18);
-    graphics.strokeEllipse(center.x - radius * 0.05, center.y + radius * 0.02, radius * 1.58, radius * 1.08);
-    graphics.lineStyle(2, 0xffd166, 0.16);
-    graphics.strokeEllipse(center.x + radius * 0.08, center.y - radius * 0.03, radius * 1.24, radius * 0.78);
+    const coreImage = this.add
+      .image(center.x, center.y, GROWTH_COMMAND_CORE_KEY)
+      .setDisplaySize(radius * 2.55, radius * 1.88)
+      .setAlpha(0.96)
+      .setDepth(1.6);
+    this.objects.push(coreImage);
 
     for (let lane = -2; lane <= 2; lane += 1) {
       const y = center.y + lane * radius * 0.16;
@@ -330,20 +342,30 @@ export class SlimeGrowthScene extends Phaser.Scene {
         .setOrigin(0)
         .setStrokeStyle(slot.evolved ? 2 : 1, slot.evolved ? 0xffd166 : color, slot.skillId ? 0.82 : 0.42)
         .setDepth(3);
+      const slotKey = slot.evolved
+        ? GROWTH_SLOT_EVOLVED_KEY
+        : slot.skillId
+          ? GROWTH_SLOT_ACTIVE_KEY
+          : GROWTH_SLOT_EMPTY_KEY;
+      const slotFrame = this.add
+        .image(px + 14, py + pillHeight / 2, slotKey)
+        .setDisplaySize(24, 24)
+        .setAlpha(slot.skillId ? 0.95 : 0.64)
+        .setDepth(4);
       if (slot.skillId) {
-        this.addSkillImage(slot.skillId, px + 13, py + pillHeight / 2, 19, 0.86, 4);
+        this.addSkillImage(slot.skillId, px + 14, py + pillHeight / 2, 14, 0.9, 4.6);
       }
       const label = slot.skillId ? `${slotLabel(slot)} Lv.${slot.level}` : "空き";
       this.addText(
-        px + (slot.skillId ? 28 : 7),
+        px + 31,
         py + 6,
         label,
         10,
         definition?.accent ?? "#7f98a5",
         slot.skillId ? 700 : 500,
-        pillWidth - (slot.skillId ? 35 : 14),
+        pillWidth - 38,
       ).setDepth(4);
-      this.objects.push(pill);
+      this.objects.push(pill, slotFrame);
     });
   }
 
@@ -412,16 +434,19 @@ export class SlimeGrowthScene extends Phaser.Scene {
       graphics.lineStyle(2, color, slot.skillId ? 0.52 : 0.24);
       graphics.lineBetween(center.x, center.y, x, y);
 
-      const outer = this.add
-        .circle(x, y, slotRadius + 5, 0x071118, 0.88)
-        .setStrokeStyle(slot.evolved ? 4 : 2, slot.evolved ? 0xffd166 : color, slot.skillId ? 0.88 : 0.42)
-        .setDepth(3);
-      const inner = this.add
-        .circle(x, y, slotRadius, color, slot.skillId ? 0.82 : 0.22)
-        .setStrokeStyle(2, 0xeafaff, slot.skillId ? 0.4 : 0.16)
-        .setDepth(4);
+      const slotKey = slot.evolved
+        ? GROWTH_SLOT_EVOLVED_KEY
+        : slot.skillId
+          ? GROWTH_SLOT_ACTIVE_KEY
+          : GROWTH_SLOT_EMPTY_KEY;
+      const frameSize = slotRadius * (slot.evolved ? 3.02 : 2.72);
+      const frame = this.add
+        .image(x, y, slotKey)
+        .setDisplaySize(frameSize, frameSize)
+        .setAlpha(slot.skillId ? 0.98 : 0.7)
+        .setDepth(3.6);
       if (slot.skillId) {
-        this.addSkillImage(slot.skillId, x, y, slotRadius * 1.42, 0.78, 4.6);
+        this.addSkillImage(slot.skillId, x, y, slotRadius * 1.32, 0.84, 4.6);
       }
       const glow = this.add
         .circle(x, y, slotRadius + 12, color, slot.skillId ? 0.16 : 0.04)
@@ -432,14 +457,6 @@ export class SlimeGrowthScene extends Phaser.Scene {
         alpha: slot.skillId ? 0.34 : 0.1,
         scale: slot.skillId ? 1.16 : 1.08,
         duration: 1500 + slot.index * 130,
-        yoyo: true,
-        repeat: -1,
-        ease: "Sine.easeInOut",
-      });
-      this.tweens.add({
-        targets: [outer, inner],
-        scale: slot.skillId ? 1.06 : 1.025,
-        duration: 2100 + slot.index * 180,
         yoyo: true,
         repeat: -1,
         ease: "Sine.easeInOut",
@@ -455,7 +472,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
       );
       label.setAlign("center").setDepth(5);
       this.drawLevelPips(x, y + slotRadius - 4, slot, definition?.maxLevel ?? 5, color);
-      this.objects.push(glow, outer, inner, label);
+      this.objects.push(glow, frame, label);
     });
     this.objects.push(graphics);
   }

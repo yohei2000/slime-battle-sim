@@ -323,24 +323,6 @@ export class StrategyMapScene extends Phaser.Scene {
         this.state = selectRegion(this.state, region.id);
         this.redraw();
       });
-      this.tweens.add({
-        targets: node,
-        alpha: selected ? 1 : 0.86,
-        scale: selected ? 1.06 : 1.03,
-        duration: 1700 + region.frontPressure * 8,
-        yoyo: true,
-        repeat: -1,
-        ease: "Sine.easeInOut",
-      });
-      this.tweens.add({
-        targets: glow,
-        alpha: selected ? 0.32 : 0.16,
-        scale: selected ? 1.12 : 1.06,
-        duration: 1700 + region.frontPressure * 8,
-        yoyo: true,
-        repeat: -1,
-        ease: "Sine.easeInOut",
-      });
 
       const pressureColor =
         region.frontPressure > 44 ? "#ff91aa" : region.frontPressure > 25 ? "#ffd166" : "#7cecff";
