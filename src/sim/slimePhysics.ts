@@ -317,7 +317,17 @@ function enforceZocBoundary(slime: ArmySlime, enemy: ArmySlime): void {
     if (!sample.insideZoc) continue;
 
     contactNormals.push(sample.outwardNormal);
-    node.position = projectOutsideEnemyZoc(enemy, node.position, 1, 10);
+    const correctionLimit = clamp(
+      22 + Math.max(0, sample.penetration) * 0.72,
+      22,
+      44,
+    );
+    node.position = projectOutsideEnemyZoc(
+      enemy,
+      node.position,
+      1,
+      correctionLimit,
+    );
     const normalVelocity = dot(node.velocity, sample.outwardNormal);
     const tangentVelocity = sub(
       node.velocity,

@@ -19,7 +19,6 @@ import {
 import {
   getZocBoundaryThickness,
   getZocFieldSegments,
-  sampleEnemyZoc,
 } from "../sim/zoc";
 
 const COLORS = {
@@ -97,7 +96,6 @@ export class SlimeOverlay {
     this.effectGraphics.clear();
     this.causeLabel?.setVisible(false);
     for (const slime of slimes) this.drawSlime(slime, time);
-    this.drawZocIntrusionPressure(slimes, time);
     this.updateLabels(slimes);
   }
 
@@ -228,61 +226,6 @@ export class SlimeOverlay {
         segment.end.x,
         segment.end.y,
       );
-    }
-  }
-
-  private drawZocIntrusionPressure(slimes: ArmySlime[], time: number): void {
-    const pulse = 0.82 + Math.sin(time * 0.018) * 0.18;
-    for (const own of slimes) {
-      const enemies = slimes.filter((candidate) => candidate.side !== own.side);
-      if (enemies.length === 0) continue;
-
-      for (const enemy of enemies) {
-        const enemyThickness = getZocBoundaryThickness(enemy);
-        const ownBoundary = getBoundaryNodes(own);
-        const pressuredNodes = ownBoundary
-          .map((node) => ({ node, sample: sampleEnemyZoc(enemy, node.position) }))
-          .filter(({ sample }) => sample.insideZoc);
-
-        pressuredNodes.forEach(({ node, sample }, index) => {
-          if (index % 2 !== 0 && pressuredNodes.length > 5) return;
-          const normal = sample.outwardNormal;
-          const tangent = perpendicular(normal);
-          const penetrationRatio = clamp(
-            sample.penetration / Math.max(1, enemyThickness),
-            0,
-            1.8,
-          );
-          const pressure =
-            penetrationRatio * 0.72 +
-            clamp(node.localPressure / 100, 0, 1) * 0.28;
-          const halfLength = clamp(12 + pressure * 30, 14, 42);
-          const center = add(
-            sample.zocClosestPoint,
-            scale(normal, 1.2 + pressure * 1.8),
-          );
-          const a = add(center, scale(tangent, -halfLength));
-          const b = add(center, scale(tangent, halfLength));
-          const glowWidth = 4 + pressure * 7;
-          const coreWidth = 1.6 + pressure * 2.6;
-          const alpha = clamp(0.45 + pressure * 0.32, 0.45, 0.86) * pulse;
-
-          this.effectGraphics.lineStyle(glowWidth, 0xffffff, alpha * 0.32);
-          this.effectGraphics.lineBetween(a.x, a.y, b.x, b.y);
-          this.effectGraphics.lineStyle(coreWidth, 0xffd166, alpha);
-          this.effectGraphics.lineBetween(a.x, a.y, b.x, b.y);
-
-          const braceStart = add(center, scale(normal, -4));
-          const braceEnd = add(center, scale(normal, 10 + pressure * 8));
-          this.effectGraphics.lineStyle(1.1 + pressure * 1.2, 0xffffff, alpha * 0.72);
-          this.effectGraphics.lineBetween(
-            braceStart.x,
-            braceStart.y,
-            braceEnd.x,
-            braceEnd.y,
-          );
-        });
-      }
     }
   }
 
