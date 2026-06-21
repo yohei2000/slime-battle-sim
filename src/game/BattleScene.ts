@@ -7,8 +7,10 @@ import { MobileHUD } from "../ui/MobileHUD";
 import { BattleLog } from "../ui/BattleLog";
 import { DebugOverlay } from "../ui/DebugOverlay";
 import { TutorialOverlay } from "../ui/TutorialOverlay";
+import { BattleResultOverlay } from "../ui/BattleResultOverlay";
 import { CameraController } from "../input/CameraController";
 import { TouchInputController } from "../input/TouchInputController";
+import type { BattleResultPayload } from "./battleResult";
 
 export class BattleScene extends Phaser.Scene {
   private simulation!: BattleSimulation;
@@ -17,13 +19,19 @@ export class BattleScene extends Phaser.Scene {
   private hud!: MobileHUD;
   private battleLog!: BattleLog;
   private debugOverlay!: DebugOverlay;
+  private resultOverlay!: BattleResultOverlay;
   private cameraController!: CameraController;
   private uiCamera!: Phaser.Cameras.Scene2D.Camera;
   private touchController!: TouchInputController;
+  private resultReturnEvent?: Phaser.Time.TimerEvent;
+  private resultPayload?: BattleResultPayload;
   private lastPlayerPosture = "neutral";
   private lastEnemyPosture = "neutral";
   private stressDetail = false;
   private lastStressBand = 0;
+  private resultShown = false;
+  private returningToStrategy = false;
+  private resultShownAtMs = 0;
 
   constructor() {
     super("BattleScene");
@@ -42,6 +50,7 @@ export class BattleScene extends Phaser.Scene {
     this.gesturePreview = new GesturePreview(this);
     this.battleLog = new BattleLog(this);
     this.debugOverlay = new DebugOverlay(this);
+    this.resultOverlay = new BattleResultOverlay(this, () => this.returnToStrategy());
     this.touchController = new TouchInputController(
       this,
       this.cameraController,
@@ -79,6 +88,7 @@ export class BattleScene extends Phaser.Scene {
       ...this.hud.objects(),
       ...this.battleLog.objects(),
       ...this.debugOverlay.objects(),
+      ...this.resultOverlay.objects(),
       ...tutorial.objects(),
     ];
     this.uiCamera = this.cameras.add(0, 0, this.scale.width, this.scale.height, false, "HudCamera");
@@ -92,7 +102,11 @@ export class BattleScene extends Phaser.Scene {
       this.cameras.main.setSize(gameSize.width, gameSize.height);
       this.uiCamera.setSize(gameSize.width, gameSize.height);
     });
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.touchController.destroy());
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.resultReturnEvent?.remove(false);
+      this.resultOverlay.destroy();
+      this.touchController.destroy();
+    });
   }
 
   update(_time: number, delta: number): void {
@@ -105,6 +119,7 @@ export class BattleScene extends Phaser.Scene {
     this.gesturePreview.draw(player);
     this.hud.update();
     this.debugOverlay.update(this.simulation.state);
+    this.handleBattleResult();
 
     if (player.posture !== this.lastPlayerPosture) {
       this.battleLog.push(`自軍：${player.posture}`);
@@ -128,6 +143,51 @@ export class BattleScene extends Phaser.Scene {
       );
     }
     this.lastStressBand = stressBand;
+  }
+
+  private handleBattleResult(): void {
+    const { winner, winnerAt, playerSlimes, enemySlimes, elapsed } = this.simulation.state;
+    if (!winner || winnerAt === undefined) return;
+
+    if (!this.resultShown) {
+      this.resultShown = true;
+      this.resultShownAtMs = this.time.now;
+      this.resultPayload = {
+        outcome: winner,
+        elapsedSeconds: elapsed,
+        playerMorale: this.averageMorale(playerSlimes),
+        enemyMorale: this.averageMorale(enemySlimes),
+        playerSlimeCount: playerSlimes.length,
+        enemySlimeCount: enemySlimes.length,
+        finishedAt: Date.now(),
+      };
+      this.resultOverlay.show(this.resultPayload);
+      this.battleLog.push(
+        winner === "player"
+          ? "戦闘終了：勝利"
+          : winner === "enemy"
+            ? "戦闘終了：敗北"
+            : "戦闘終了：痛み分け",
+      );
+      this.touchController.setUiCapture(true);
+      this.resultReturnEvent = this.time.delayedCall(4000, () => this.returnToStrategy());
+    }
+
+    this.resultOverlay.setCountdown(4 - (this.time.now - this.resultShownAtMs) / 1000);
+  }
+
+  private returnToStrategy(): void {
+    if (this.returningToStrategy) return;
+    this.returningToStrategy = true;
+    this.resultReturnEvent?.remove(false);
+    this.scene.start("StrategyMapScene", {
+      battleResult: this.resultPayload,
+    });
+  }
+
+  private averageMorale(slimes: Array<{ morale: number }>): number {
+    if (!slimes.length) return 0;
+    return slimes.reduce((total, slime) => total + slime.morale, 0) / slimes.length;
   }
 
   private drawBattlefield(width: number, height: number): Phaser.GameObjects.Graphics {

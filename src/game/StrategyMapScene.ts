@@ -23,6 +23,7 @@ import type {
   RegionNode,
   TerrainType,
 } from "../campaign/types";
+import { battleOutcomeTitle, battleResultReport, type BattleResultPayload } from "./battleResult";
 
 type LayoutRect = {
   x: number;
@@ -75,6 +76,7 @@ const STRATEGY_IMAGE_KEYS = [
 
 export class StrategyMapScene extends Phaser.Scene {
   private state: CampaignState = createInitialCampaignState();
+  private lastBattleResult?: BattleResultPayload;
   private objects: Phaser.GameObjects.GameObject[] = [];
   private mapRect: LayoutRect = { x: 0, y: 0, width: 0, height: 0 };
   private panelRect: LayoutRect = { x: 0, y: 0, width: 0, height: 0 };
@@ -88,6 +90,16 @@ export class StrategyMapScene extends Phaser.Scene {
     STRATEGY_IMAGE_KEYS.forEach((key) => {
       this.load.image(key, `assets/generated/${key}-${STRATEGY_GENERATED_ASSET_VERSION}.png`);
     });
+  }
+
+  init(data?: { battleResult?: BattleResultPayload }): void {
+    const result = data?.battleResult;
+    if (!result || result.finishedAt === this.lastBattleResult?.finishedAt) return;
+    this.lastBattleResult = result;
+    this.state = {
+      ...this.state,
+      reports: [battleResultReport(result), ...this.state.reports].slice(0, 5),
+    };
   }
 
   create(): void {
@@ -107,6 +119,7 @@ export class StrategyMapScene extends Phaser.Scene {
 
     this.addBackground(width, height);
     this.addHeader(width);
+    this.addBattleResultBanner(width);
 
     if (isWide) {
       this.mapRect = {
@@ -207,6 +220,34 @@ export class StrategyMapScene extends Phaser.Scene {
       true,
       0x23424d,
     );
+  }
+
+  private addBattleResultBanner(width: number): void {
+    if (!this.lastBattleResult) return;
+    const label = battleOutcomeTitle(this.lastBattleResult.outcome);
+    const color =
+      this.lastBattleResult.outcome === "player"
+        ? "#7cecff"
+        : this.lastBattleResult.outcome === "enemy"
+          ? "#ff91aa"
+          : "#ffd166";
+    const bannerWidth = Math.min(width - 28, 360);
+    const banner = this.add
+      .rectangle(14, 66, bannerWidth, 30, 0x07131d, 0.9)
+      .setOrigin(0)
+      .setStrokeStyle(1, 0x7cecff, 0.42)
+      .setDepth(8);
+    const text = this.addText(
+      26,
+      72,
+      `直近戦闘: ${label}  士気 ${Math.round(this.lastBattleResult.playerMorale)} / 敵 ${Math.round(this.lastBattleResult.enemyMorale)}`,
+      12,
+      color,
+      700,
+      bannerWidth - 24,
+    );
+    text.setDepth(9);
+    this.objects.push(banner);
   }
 
   private addMapFrame(): void {
