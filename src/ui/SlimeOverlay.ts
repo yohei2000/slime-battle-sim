@@ -9,7 +9,10 @@ import {
 } from "../sim/stressDiagnostics";
 import {
   add,
+  average,
   clamp,
+  distance,
+  dot,
   lerp,
   normalize,
   perpendicular,
@@ -97,18 +100,35 @@ export class SlimeOverlay {
     this.particleGraphics.clear();
     this.effectGraphics.clear();
     this.causeLabel?.setVisible(false);
-    for (const slime of slimes) this.drawSlime(slime, time, slimes);
+    const containedZocIds = this.containedZocIds(slimes);
+    for (const slime of slimes)
+      this.drawSlime(slime, time, slimes, containedZocIds);
     this.updateLabels(slimes);
   }
 
-  private drawSlime(slime: ArmySlime, time: number, slimes: ArmySlime[]): void {
+  private drawSlime(
+    slime: ArmySlime,
+    time: number,
+    slimes: ArmySlime[],
+    containedZocIds: Set<string>,
+  ): void {
     const color = COLORS[slime.side];
     const boundary = getBoundaryNodes(slime);
     const rawPoints = boundary.map((node) => ({ ...node.position }));
     const points = smoothClosed(rawPoints);
 
     const enemies = slimes.filter((candidate) => candidate.side !== slime.side);
-    this.drawZocField(slime, enemies, boundary, color.zoc);
+    const clipEnemies = enemies.filter(
+      (enemy) => !containedZocIds.has(enemy.id),
+    );
+    this.drawZocField(
+      slime,
+      clipEnemies,
+      boundary,
+      color.zoc,
+      containedZocIds.has(slime.id),
+      time,
+    );
 
     if (this.shouldDrawAsArms(slime)) {
       this.drawArmBody(slime, boundary, color.fill, color.edge);
@@ -144,12 +164,52 @@ export class SlimeOverlay {
     );
   }
 
+  private zocBlockedRatio(slime: ArmySlime, enemies: ArmySlime[]): number {
+    if (enemies.length === 0) return 0;
+    const segments = getZocFieldSegments(slime);
+    if (segments.length === 0) return 0;
+    let blocked = 0;
+    let total = 0;
+    for (const segment of segments) {
+      const midpoint = {
+        x: (segment.start.x + segment.end.x) * 0.5,
+        y: (segment.start.y + segment.end.y) * 0.5,
+      };
+      total += 1;
+      if (!isZocCenterlineOpen(slime, enemies, midpoint)) blocked += 1;
+    }
+    return blocked / Math.max(1, total);
+  }
+
+  private containedZocIds(slimes: ArmySlime[]): Set<string> {
+    const contained = new Set<string>();
+    for (const slime of slimes) {
+      const enemies = slimes.filter((candidate) => candidate.side !== slime.side);
+      const blockedRatio = this.zocBlockedRatio(slime, enemies);
+      if (
+        slime.isEncircled ||
+        slime.encirclement > 0.22 ||
+        (slime.isEngaged && blockedRatio > 0.42) ||
+        blockedRatio > 0.58
+      ) {
+        contained.add(slime.id);
+      }
+    }
+    return contained;
+  }
+
   private drawZocField(
     slime: ArmySlime,
     enemies: ArmySlime[],
     boundary: SlimeNode[],
     zocColor: number,
+    containedZoc: boolean,
+    time: number,
   ): void {
+    if (containedZoc) {
+      this.drawContainedZocPocket(slime, zocColor, time);
+      return;
+    }
     const segments = getExclusiveZocFieldSegments(slime, enemies);
     const thickness = getZocBoundaryThickness(slime);
     const fieldWidth = thickness * 1.55;
@@ -184,6 +244,81 @@ export class SlimeOverlay {
         segment.end.y,
       );
     }
+  }
+
+  private drawContainedZocPocket(
+    slime: ArmySlime,
+    zocColor: number,
+    time: number,
+  ): void {
+    const aliveParticles = slime.particles.filter((particle) => particle.alive);
+    const particlePoints = aliveParticles.map((particle) => particle.position);
+    const roughCenter =
+      particlePoints.length > 0 ? average(particlePoints) : { ...slime.center };
+    const compactPoints = [...particlePoints]
+      .sort((a, b) => distance(a, roughCenter) - distance(b, roughCenter))
+      .slice(0, Math.max(10, Math.floor(particlePoints.length * 0.72)));
+    const coreCenter =
+      compactPoints.length > 0 ? average(compactPoints) : roughCenter;
+    const direction = normalize(slime.facing);
+    const lateral = perpendicular(direction);
+    const thickness = getZocBoundaryThickness(slime);
+    let forwardVariance = 0;
+    let lateralVariance = 0;
+    for (const point of compactPoints) {
+      const delta = sub(point, coreCenter);
+      const forward = dot(delta, direction);
+      const sideways = dot(delta, lateral);
+      forwardVariance += forward * forward;
+      lateralVariance += sideways * sideways;
+    }
+    const count = Math.max(1, compactPoints.length);
+    const forwardRadius = clamp(
+      Math.sqrt(forwardVariance / count) * 1.9 + thickness * 1.55,
+      34,
+      Math.max(58, slime.baseDepth * 0.44),
+    );
+    const lateralRadius = clamp(
+      Math.sqrt(lateralVariance / count) * 1.9 + thickness * 1.55,
+      38,
+      Math.max(64, slime.baseWidth * 0.42),
+    );
+    const points: Vector2Like[] = [];
+    const pointCount = 30;
+    for (let i = 0; i < pointCount; i += 1) {
+      const angle = (i / pointCount) * Math.PI * 2;
+      const pulse =
+        1 +
+        Math.sin(angle * 3 + time * 0.004 + slime.center.x * 0.01) * 0.045 +
+        Math.cos(angle * 5 + time * 0.003) * 0.025;
+      points.push(
+        add(
+          coreCenter,
+          add(
+            scale(direction, Math.cos(angle) * forwardRadius * pulse),
+            scale(lateral, Math.sin(angle) * lateralRadius * pulse),
+          ),
+        ),
+      );
+    }
+
+    this.zocGraphics.fillStyle(zocColor, 0.055);
+    this.zocGraphics.lineStyle(9, zocColor, 0.08);
+    drawPolygon(this.zocGraphics, points);
+    this.zocGraphics.fillStyle(zocColor, 0.035);
+    this.zocGraphics.lineStyle(
+      slime.isSelected ? 3.6 : 2.6,
+      zocColor,
+      slime.isSelected ? 0.86 : 0.72,
+    );
+    drawPolygon(this.zocGraphics, smoothClosed(points, 1));
+
+    this.zocGraphics.fillStyle(0xffffff, 0.08);
+    this.zocGraphics.fillCircle(
+      coreCenter.x,
+      coreCenter.y,
+      Math.max(8, Math.min(forwardRadius, lateralRadius) * 0.18),
+    );
   }
 
   private drawArmBody(
