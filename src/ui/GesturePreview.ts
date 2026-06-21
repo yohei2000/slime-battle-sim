@@ -1,31 +1,38 @@
 import Phaser from "phaser";
 import type { ArmySlime, GesturePreviewState, Vector2Like } from "../sim/types";
-import { add, normalize, perpendicular, scale, sub } from "../sim/vector";
+import { add, clamp, normalize, perpendicular, scale, sub } from "../sim/vector";
 
 export class GesturePreview {
   private readonly graphics: Phaser.GameObjects.Graphics;
   private readonly label: Phaser.GameObjects.Text;
   private state: GesturePreviewState = { active: false, mode: "none" };
 
-  constructor(scene: Phaser.Scene) {
+  constructor(private readonly scene: Phaser.Scene) {
     this.graphics = scene.add.graphics().setDepth(20);
     this.label = scene.add
       .text(0, 0, "", {
         fontFamily: "Inter, Noto Sans JP, sans-serif",
-        fontSize: "17px",
+        fontSize: "24px",
         color: "#ffffff",
-        backgroundColor: "#07131ddd",
-        padding: { x: 10, y: 7 },
+        backgroundColor: "#07131df2",
+        padding: { x: 14, y: 10 },
         stroke: "#07131d",
-        strokeThickness: 2,
+        strokeThickness: 4,
+        lineSpacing: 6,
+        wordWrap: { width: 210, useAdvancedWrap: true },
       })
-      .setOrigin(0.5, 1)
-      .setDepth(21)
+      .setOrigin(0, 1)
+      .setScrollFactor(0)
+      .setDepth(120)
       .setVisible(false);
   }
 
   objects(): Phaser.GameObjects.GameObject[] {
-    return [this.graphics, this.label];
+    return [this.graphics];
+  }
+
+  uiObjects(): Phaser.GameObjects.GameObject[] {
+    return [this.label];
   }
 
   setState(state: GesturePreviewState): void {
@@ -53,12 +60,11 @@ export class GesturePreview {
       if (this.state.targetPoint) {
         this.drawTargetMarker(this.state.targetPoint, color, this.state.focusMode);
       }
-      this.showLabel(
-        (this.state.targetPoint ?? this.state.end).x,
-        (this.state.targetPoint ?? this.state.end).y - 22,
+      this.showLabelNearWorld(
+        this.state.targetPoint ?? this.state.end,
         this.state.focusMode
           ? this.copyForFocus(this.state.focusMode)
-          : "軍勢を流す\n命令伝達後に全体移動",
+          : "移動",
       );
       return;
     }
@@ -123,9 +129,12 @@ export class GesturePreview {
       );
     }
 
-    this.showLabel(
-      this.state.center.x,
-      this.state.center.y - this.state.width * 0.55,
+    this.showLabelNearWorld(
+      this.state.targetPoint ??
+        {
+          x: this.state.center.x,
+          y: this.state.center.y - this.state.width * 0.42,
+        },
       this.state.focusMode
         ? this.copyForFocus(this.state.focusMode)
         : this.copyForMode(this.state.mode),
@@ -264,30 +273,53 @@ export class GesturePreview {
 
   private copyForMode(mode: GesturePreviewState["mode"]): string {
     if (mode === "breakthrough")
-      return `突破\n成功見込み：${this.state.confidence ?? "中"} / 失敗リスク：高`;
+      return `突破\n成功 ${this.state.confidence ?? "中"}`;
     if (mode === "envelop-advance")
-      return "包囲前進\n幅を広げながら両翼で前進";
+      return "包囲前進";
     if (mode === "rotate")
-      return `戦線回転\n向き ${Math.round(((this.state.rotation ?? 0) * 180) / Math.PI)}°`;
+      return `戦線回転\n${Math.round(((this.state.rotation ?? 0) * 180) / Math.PI)}°`;
     if (mode === "left-wing")
-      return "左翼前進\n左翼の接触面を先行";
+      return "左翼前進";
     if (mode === "right-wing")
-      return "右翼前進\n右翼の接触面を先行";
+      return "右翼前進";
     if (mode === "contract")
-      return "密集中\n突破力 +++ / 包囲・過密リスク +";
+      return "密集\n突破+";
     if (mode === "envelop")
-      return "包囲姿勢\n包囲力 +++ / 中央突破リスク +";
-    return "展開中\n包囲力 +++ / 局所密度 -- / 突破リスク +";
+      return "包囲\n両翼+";
+    return "展開\n包囲+";
   }
 
   private copyForFocus(mode: "breakthrough" | "envelop"): string {
     if (mode === "breakthrough") {
-      return "狙点突破\nこの部分を貫く / 圧力集中";
+      return "ここを貫く\n突破";
     }
-    return "狙点包囲\nこの部分を包む / 両翼を回す";
+    return "ここを包む\n包囲";
   }
 
-  private showLabel(x: number, y: number, text: string): void {
-    this.label.setPosition(x, y).setText(text).setVisible(true);
+  private showLabelNearWorld(anchor: Vector2Like, text: string): void {
+    const camera = this.scene.cameras.main;
+    const viewportWidth = camera.width;
+    const viewportHeight = camera.height;
+    const screen = {
+      x: (anchor.x - camera.worldView.x) * camera.zoom,
+      y: (anchor.y - camera.worldView.y) * camera.zoom,
+    };
+    const placeRight = screen.x < viewportWidth * 0.58;
+    const placeAbove = screen.y > viewportHeight * 0.34;
+    const x = clamp(
+      screen.x + (placeRight ? 78 : -78),
+      18,
+      viewportWidth - 18,
+    );
+    const y = clamp(
+      screen.y + (placeAbove ? -96 : 96),
+      72,
+      viewportHeight - 150,
+    );
+    this.label
+      .setOrigin(placeRight ? 0 : 1, placeAbove ? 1 : 0)
+      .setPosition(x, y)
+      .setText(text)
+      .setVisible(true);
   }
 }

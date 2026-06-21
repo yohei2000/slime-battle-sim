@@ -75,6 +75,7 @@ export class BattleScene extends Phaser.Scene {
       ...this.gesturePreview.objects(),
     ];
     const uiObjects = [
+      ...this.gesturePreview.uiObjects(),
       ...this.hud.objects(),
       ...this.battleLog.objects(),
       ...this.debugOverlay.objects(),
