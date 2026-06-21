@@ -16,7 +16,7 @@ import {
   scale,
   sub,
 } from "../sim/vector";
-import { getZocBoundaryPoints } from "../sim/zoc";
+import { getZocFieldSegments } from "../sim/zoc";
 
 const COLORS = {
   player: { fill: 0x28bde9, edge: 0x9ceeff, particle: 0xd9faff, zoc: 0x2dd4ef },
@@ -101,19 +101,20 @@ export class SlimeOverlay {
     const boundary = getBoundaryNodes(slime);
     const rawPoints = boundary.map((node) => ({ ...node.position }));
     const points = smoothClosed(rawPoints);
-    const zocPoints = getZocBoundaryPoints(slime);
 
-    this.zocGraphics.fillStyle(color.zoc, 0.055);
-    this.zocGraphics.lineStyle(1.5, color.zoc, 0.2);
-    drawPolygon(this.zocGraphics, zocPoints);
+    this.drawZocField(slime, boundary, color.zoc);
 
-    this.bodyGraphics.fillStyle(color.fill, 0.2 + Math.min(0.24, slime.currentDensity * 0.1));
-    this.bodyGraphics.lineStyle(
-      slime.isSelected ? 5 : 3,
-      slime.isRouting ? 0xffd166 : color.edge,
-      slime.isSelected ? 0.98 : 0.75,
-    );
-    drawPolygon(this.bodyGraphics, points);
+    if (this.shouldDrawAsArms(slime)) {
+      this.drawArmBody(slime, boundary, color.fill, color.edge);
+    } else {
+      this.bodyGraphics.fillStyle(color.fill, 0.2 + Math.min(0.24, slime.currentDensity * 0.1));
+      this.bodyGraphics.lineStyle(
+        slime.isSelected ? 5 : 3,
+        slime.isRouting ? 0xffd166 : color.edge,
+        slime.isSelected ? 0.98 : 0.75,
+      );
+      drawPolygon(this.bodyGraphics, points);
+    }
     this.drawNodeDensity(slime, color.fill);
     this.drawStressNetwork(slime, time);
 
@@ -127,6 +128,97 @@ export class SlimeOverlay {
     this.drawFacing(slime, color.edge);
     this.drawWarnings(slime, boundary, time);
     this.drawContacts(slime, color.edge);
+  }
+
+  private shouldDrawAsArms(slime: ArmySlime): boolean {
+    return (
+      slime.posture === "envelop" ||
+      slime.currentWidth > slime.baseWidth * 1.36 ||
+      slime.envelopPower > 0.72
+    );
+  }
+
+  private drawZocField(
+    slime: ArmySlime,
+    boundary: SlimeNode[],
+    zocColor: number,
+  ): void {
+    const segments = getZocFieldSegments(slime);
+    const width = clamp(slime.zocRadius * 1.45, 28, 94);
+    const fillAlpha = slime.posture === "envelop" ? 0.04 : 0.047;
+    const edgeAlpha = slime.posture === "envelop" ? 0.22 : 0.18;
+
+    this.zocGraphics.lineStyle(width, zocColor, fillAlpha);
+    for (const segment of segments) {
+      this.zocGraphics.lineBetween(
+        segment.start.x,
+        segment.start.y,
+        segment.end.x,
+        segment.end.y,
+      );
+    }
+    this.zocGraphics.fillStyle(zocColor, fillAlpha * 0.86);
+    for (const node of boundary) {
+      this.zocGraphics.fillCircle(node.position.x, node.position.y, width * 0.5);
+    }
+
+    this.zocGraphics.lineStyle(1.35, zocColor, edgeAlpha);
+    for (const segment of segments) {
+      this.zocGraphics.lineBetween(
+        segment.start.x,
+        segment.start.y,
+        segment.end.x,
+        segment.end.y,
+      );
+    }
+  }
+
+  private drawArmBody(
+    slime: ArmySlime,
+    boundary: SlimeNode[],
+    fillColor: number,
+    edgeColor: number,
+  ): void {
+    const segments = getZocFieldSegments(slime);
+    const bodyWidth = clamp(
+      24 + slime.currentDensity * 18 + slime.pressure * 0.08,
+      30,
+      58,
+    );
+    const fillAlpha = 0.13 + Math.min(0.12, slime.currentDensity * 0.05);
+    const edgeAlpha = slime.isSelected ? 0.96 : 0.58;
+
+    this.bodyGraphics.lineStyle(bodyWidth, fillColor, fillAlpha);
+    for (const segment of segments) {
+      this.bodyGraphics.lineBetween(
+        segment.start.x,
+        segment.start.y,
+        segment.end.x,
+        segment.end.y,
+      );
+    }
+    this.bodyGraphics.fillStyle(fillColor, fillAlpha * 1.05);
+    for (const node of boundary) {
+      this.bodyGraphics.fillCircle(
+        node.position.x,
+        node.position.y,
+        bodyWidth * (node.role === "front" ? 0.62 : 0.56),
+      );
+    }
+
+    this.bodyGraphics.lineStyle(
+      slime.isSelected ? 4 : 2.2,
+      slime.isRouting ? 0xffd166 : edgeColor,
+      edgeAlpha,
+    );
+    for (const segment of segments) {
+      this.bodyGraphics.lineBetween(
+        segment.start.x,
+        segment.start.y,
+        segment.end.x,
+        segment.end.y,
+      );
+    }
   }
 
   private drawNodeDensity(slime: ArmySlime, fillColor: number): void {

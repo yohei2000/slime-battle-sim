@@ -12,8 +12,15 @@ export type ZocBoundarySample = {
   penetration: number;
 };
 
+export type ZocFieldSegment = {
+  start: Vector2Like;
+  end: Vector2Like;
+};
+
 type BoundaryCacheEntry = {
   bodyPoints: Vector2Like[];
+  bodySegments: ZocFieldSegment[];
+  zocSegments: ZocFieldSegment[];
   zocPointsByScale: Map<number, Vector2Like[]>;
 };
 
@@ -33,16 +40,55 @@ function sortedBoundary(slime: ArmySlime, nodes: SlimeNode[]): SlimeNode[] {
   );
 }
 
+function uniqueLinkSegments(slime: ArmySlime): ZocFieldSegment[] {
+  const byId = new Map(slime.nodes.map((node) => [node.id, node]));
+  const seen = new Set<string>();
+  const segments: ZocFieldSegment[] = [];
+  for (const node of slime.nodes) {
+    for (const link of node.links) {
+      if (link.broken) continue;
+      const key = [link.nodeAId, link.nodeBId].sort().join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const a = byId.get(link.nodeAId);
+      const b = byId.get(link.nodeBId);
+      if (!a || !b) continue;
+      segments.push({
+        start: { ...a.position },
+        end: { ...b.position },
+      });
+    }
+  }
+  return segments;
+}
+
+function ringSegments(nodes: SlimeNode[]): ZocFieldSegment[] {
+  if (nodes.length < 2) return [];
+  const segments: ZocFieldSegment[] = [];
+  for (let i = 0; i < nodes.length; i += 1) {
+    const a = nodes[i];
+    const b = nodes[(i + 1) % nodes.length];
+    segments.push({
+      start: { ...a.position },
+      end: { ...b.position },
+    });
+  }
+  return segments;
+}
+
 function cachedBoundary(slime: ArmySlime): BoundaryCacheEntry {
   const cached = boundaryCache.get(slime);
   if (cached) return cached;
 
   const nodes = boundaryNodes(slime);
-  const bodyPoints = sortedBoundary(slime, nodes).map((node) => ({
+  const sortedNodes = sortedBoundary(slime, nodes);
+  const bodyPoints = sortedNodes.map((node) => ({
     ...node.position,
   }));
   const entry: BoundaryCacheEntry = {
     bodyPoints,
+    bodySegments: uniqueLinkSegments(slime),
+    zocSegments: ringSegments(sortedNodes),
     zocPointsByScale: new Map(),
   };
   boundaryCache.set(slime, entry);
@@ -63,19 +109,6 @@ function closestPointOnSegment(
   if (lengthSquared < 0.0001) return { ...start };
   const t = clamp(dot(sub(point, start), segment) / lengthSquared, 0, 1);
   return add(start, scale(segment, t));
-}
-
-function pointInsidePolygon(points: Vector2Like[], point: Vector2Like): boolean {
-  let inside = false;
-  for (let i = 0, j = points.length - 1; i < points.length; j = i, i += 1) {
-    const a = points[i];
-    const b = points[j];
-    const crosses =
-      a.y > point.y !== b.y > point.y &&
-      point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y || 0.0001) + a.x;
-    if (crosses) inside = !inside;
-  }
-  return inside;
 }
 
 function smoothClosed(points: Vector2Like[], passes = 2): Vector2Like[] {
@@ -110,6 +143,13 @@ export function getBodyBoundaryPoints(slime: ArmySlime): Vector2Like[] {
   return cachedBoundary(slime).bodyPoints.map((point) => ({ ...point }));
 }
 
+export function getZocFieldSegments(slime: ArmySlime): ZocFieldSegment[] {
+  return cachedBoundary(slime).zocSegments.map((segment) => ({
+    start: { ...segment.start },
+    end: { ...segment.end },
+  }));
+}
+
 export function getZocBoundaryPoints(
   slime: ArmySlime,
   clearanceScale = 1,
@@ -139,8 +179,8 @@ export function getZocBoundaryPoints(
   return zocPoints.map((point) => ({ ...point }));
 }
 
-function closestPolygonSample(
-  points: Vector2Like[],
+function closestSegmentFieldSample(
+  segments: ZocFieldSegment[],
   center: Vector2Like,
   point: Vector2Like,
 ): {
@@ -148,18 +188,20 @@ function closestPolygonSample(
   distance: number;
   outwardNormal: Vector2Like;
 } {
-  let closestPoint = points[0] ?? center;
+  let closestPoint = segments[0]?.start ?? center;
   let closestDistance = Number.POSITIVE_INFINITY;
   let outwardNormal = normalize(sub(closestPoint, center));
-  for (let i = 0; i < points.length; i += 1) {
-    const start = points[i];
-    const end = points[(i + 1) % points.length];
-    const candidate = closestPointOnSegment(point, start, end);
+  for (const segment of segments) {
+    const candidate = closestPointOnSegment(point, segment.start, segment.end);
     const candidateDistance = distance(point, candidate);
     if (candidateDistance < closestDistance) {
       closestPoint = candidate;
       closestDistance = candidateDistance;
-      outwardNormal = segmentOutwardNormal(start, end, center);
+      const fromSegment = sub(point, candidate);
+      outwardNormal =
+        Math.hypot(fromSegment.x, fromSegment.y) > 0.001
+          ? normalize(fromSegment)
+          : segmentOutwardNormal(segment.start, segment.end, center);
     }
   }
   return { closestPoint, distance: closestDistance, outwardNormal };
@@ -171,18 +213,23 @@ export function sampleEnemyZoc(
   clearanceScale = 1,
 ): ZocBoundarySample {
   const cache = cachedBoundary(enemy);
-  const cacheKey = Math.round(clearanceScale * 1000) / 1000;
-  let zocPoints = cache.zocPointsByScale.get(cacheKey);
-  if (!zocPoints) {
-    zocPoints = getZocBoundaryPoints(enemy, clearanceScale);
-  }
-  const bodyPoints = cache.bodyPoints;
-  const bodySample = closestPolygonSample(bodyPoints, enemy.center, point);
-  const zocSample = closestPolygonSample(zocPoints, enemy.center, point);
-  const insideBody = pointInsidePolygon(bodyPoints, point);
-  const insideZoc = insideBody || pointInsidePolygon(zocPoints, point);
+  const bodySegments =
+    cache.bodySegments.length > 0 ? cache.bodySegments : cache.zocSegments;
+  const zocSegments =
+    cache.zocSegments.length > 0 ? cache.zocSegments : bodySegments;
+  const bodySample = closestSegmentFieldSample(
+    bodySegments,
+    enemy.center,
+    point,
+  );
+  const zocSample = closestSegmentFieldSample(zocSegments, enemy.center, point);
   const clearance = enemy.zocRadius * clearanceScale;
-  const penetration = insideZoc ? zocSample.distance : -zocSample.distance;
+  const bodyTubeRadius = 16 + Math.min(1.8, enemy.currentDensity) * 12;
+  const insideBody = bodySample.distance <= bodyTubeRadius;
+  const insideZoc = insideBody || zocSample.distance <= clearance;
+  const penetration = insideBody
+    ? Math.max(clearance, bodyTubeRadius - bodySample.distance)
+    : clearance - zocSample.distance;
 
   return {
     closestPoint: bodySample.closestPoint,
@@ -206,7 +253,7 @@ export function projectOutsideEnemyZoc(
   if (!sample.insideZoc) return point;
   const target = add(
     sample.zocClosestPoint,
-    scale(sample.outwardNormal, 0.75),
+    scale(sample.outwardNormal, sample.clearance + 0.75),
   );
   const correction = sub(target, point);
   const correctionLength = Math.hypot(correction.x, correction.y);
