@@ -7,7 +7,7 @@ export class TutorialOverlay {
     const shade = scene.add.rectangle(0, 0, 10, 10, 0x02080d, 0.82).setOrigin(0);
     const panel = scene.add.rectangle(0, 0, 430, 350, 0x0b202d, 0.98).setStrokeStyle(2, 0x7cecff, 0.7);
     const title = scene.add
-      .text(0, -140, "SLIME BATTLE SIM", {
+      .text(0, -140, "弾性軍団演習", {
         fontFamily: "Inter, Noto Sans JP, sans-serif",
         fontSize: "24px",
         color: "#a9f2ff",
@@ -19,30 +19,31 @@ export class TutorialOverlay {
         0,
         -100,
         [
-          "軍勢は、兵士の集合ではなく一つの流体です。",
-          "1本指ドラッグ　軍勢全体を流す",
-          "ピンチアウト＋前進　包囲前進",
-          "ピンチイン＋前進　突破",
-          "2本指を回す　戦線回転",
-          "片方の指だけ前へ　片翼前進",
-          "空白ドラッグ　カメラ移動",
-          "幅・密度・向き・翼を変えて戦います。",
+          "兵士を個別に動かさず、",
+          "軍全体の形を命令します。",
+          "1本指ドラッグ　前進・後退・側面展開",
+          "ピンチアウト　戦線を広げて包囲",
+          "ピンチイン　密集して突破",
+          "2本指回転　戦線角度を変更",
+          "片翼だけ前へ　右翼・左翼を押し出す",
+          "空白ドラッグ　戦場カメラ移動",
+          "密度・結束・疲労を見ながら軍形を保ちます。",
         ].join("\n"),
         {
           fontFamily: "Inter, Noto Sans JP, sans-serif",
           fontSize: "14px",
           color: "#e7f8ff",
           align: "left",
-          lineSpacing: 4,
+          lineSpacing: 5,
         },
       )
-      .setOrigin(0.5, 0);
+      .setOrigin(0, 0);
     const button = scene.add
       .rectangle(0, 142, 210, 48, 0x1eaacb, 1)
       .setStrokeStyle(2, 0xbaf5ff, 0.8)
       .setInteractive({ useHandCursor: true });
     const buttonText = scene.add
-      .text(0, 142, "戦場を開始", {
+      .text(0, 142, "演習を開始", {
         fontFamily: "Inter, Noto Sans JP, sans-serif",
         fontSize: "17px",
         color: "#04141c",
@@ -58,7 +59,9 @@ export class TutorialOverlay {
       panel.setSize(Math.min(430, gameSize.width - 30), 350);
       this.container.setPosition(gameSize.width * 0.5, gameSize.height * 0.5);
       shade.setPosition(-gameSize.width * 0.5, -gameSize.height * 0.5);
-      body.setWordWrapWidth(Math.min(385, gameSize.width - 62));
+      const bodyWidth = Math.min(360, gameSize.width - 70);
+      body.setPosition(-bodyWidth * 0.5, -104);
+      body.setWordWrapWidth(bodyWidth);
     };
     layout({ width: scene.scale.width, height: scene.scale.height });
     scene.scale.on("resize", layout);

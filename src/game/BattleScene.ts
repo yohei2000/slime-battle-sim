@@ -95,7 +95,7 @@ export class BattleScene extends Phaser.Scene {
     this.uiCamera.setScroll(0, 0).setZoom(1);
     this.uiCamera.ignore(worldObjects);
     this.cameras.main.ignore(uiObjects);
-    this.battleLog.push("自軍スライムを選択中");
+    this.battleLog.push("自軍の軍塊を選択中");
     this.battleLog.push("自軍命令は即時反映されます");
 
     this.scale.on("resize", (gameSize: Phaser.Structs.Size) => {

@@ -92,8 +92,8 @@ export class BattleResultOverlay {
     this.body.setText(
       `${battleOutcomeMessage(result.outcome)}\n\n` +
         `戦闘時間 ${Math.round(result.elapsedSeconds)}秒\n` +
-        `自軍 士気 ${Math.round(result.playerMorale)} / スライム ${result.playerSlimeCount}\n` +
-        `敵軍 士気 ${Math.round(result.enemyMorale)} / スライム ${result.enemySlimeCount}`,
+        `自軍 士気 ${Math.round(result.playerMorale)} / 軍塊 ${result.playerSlimeCount}\n` +
+        `敵軍 士気 ${Math.round(result.enemyMorale)} / 軍塊 ${result.enemySlimeCount}`,
     );
     this.setCountdown(4);
     this.allObjects.forEach((object) => object.setVisible(true));

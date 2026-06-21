@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --base=./",
     "build": "tsc -b && vite build --base=./",
-    "preview": "vite preview --base=./"
+    "preview": "vite preview --base=./",
+    "smoke:visual": "node scripts/visual-smoke.mjs"
   },
   "dependencies": {
     "phaser": "^3.90.0"
