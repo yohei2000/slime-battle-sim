@@ -197,10 +197,17 @@ export class SlimeOverlay {
   }
 
   private shouldDrawAsArms(slime: ArmySlime): boolean {
+    const wingAdvance =
+      slime.desiredLeftWingAdvance + slime.desiredRightWingAdvance;
+    const hasAdvancedWings = wingAdvance > slime.currentDepth * 0.45;
+    const isWide =
+      slime.currentWidth > slime.baseWidth * 1.36 ||
+      slime.desiredWidth > slime.baseWidth * 1.42;
+
     return (
       slime.posture === "envelop" ||
-      slime.currentWidth > slime.baseWidth * 1.36 ||
-      slime.envelopPower > 0.72
+      (hasAdvancedWings && slime.envelopPower > 0.68) ||
+      (isWide && (slime.posture === "spread" || slime.envelopPower > 0.78))
     );
   }
 
