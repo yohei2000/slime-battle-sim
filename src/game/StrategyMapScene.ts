@@ -135,17 +135,18 @@ export class StrategyMapScene extends Phaser.Scene {
         height: height - 112,
       };
     } else {
+      const compactMapHeight = Math.max(188, Math.min(250, height * 0.28));
       this.mapRect = {
         x: 14,
         y: 78,
         width: width - 28,
-        height: Math.max(250, Math.min(300, height * 0.34)),
+        height: compactMapHeight,
       };
       this.panelRect = {
         x: 14,
-        y: this.mapRect.y + this.mapRect.height + 14,
+        y: this.mapRect.y + this.mapRect.height + 10,
         width: width - 28,
-        height: height - (this.mapRect.y + this.mapRect.height + 28),
+        height: Math.max(0, height - (this.mapRect.y + this.mapRect.height + 22)),
       };
     }
 
@@ -444,9 +445,12 @@ export class StrategyMapScene extends Phaser.Scene {
     );
     y += diplomacyHeight + (compact ? 12 : 14);
 
-    this.addText(x, y, "戦闘プレビュー", 14, "#ffd166", 700);
-    y += 20;
-    this.addPreviewText(x, y, contentWidth, preview, compact);
+    const previewFits = !compact || y + 96 <= this.panelRect.y + this.panelRect.height - 10;
+    if (previewFits) {
+      this.addText(x, y, "戦闘プレビュー", 14, "#ffd166", 700);
+      y += 20;
+      this.addPreviewText(x, y, contentWidth, preview, compact);
+    }
     if (compact) return;
     y += 128;
 
@@ -514,8 +518,8 @@ export class StrategyMapScene extends Phaser.Scene {
   ): number {
     const gap = 8;
     const compactButtons = this.scale.width < 580;
-    const columns = compactButtons ? Math.min(2, actions.length) : actions.length;
-    const buttonHeight = compactButtons ? 40 : 34;
+    const columns = compactButtons ? Math.min(actions.length, width < 330 ? 3 : 4) : actions.length;
+    const buttonHeight = compactButtons ? 38 : 34;
     const buttonWidth = Math.floor((width - gap * (columns - 1)) / columns);
     actions.forEach((action, index) => {
       const row = Math.floor(index / columns);
