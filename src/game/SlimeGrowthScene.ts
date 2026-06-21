@@ -48,7 +48,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.image(GROWTH_BACKGROUND_KEY, "assets/generated/growth-bg.png");
+    this.load.image(GROWTH_BACKGROUND_KEY, "assets/generated/growth-bg-20260621b.png");
     SKILL_DEFINITIONS.forEach((definition) => {
       this.load.image(definition.artKey, `assets/generated/${definition.artKey}.png`);
     });

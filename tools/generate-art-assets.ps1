@@ -488,15 +488,15 @@ function Draw-Icon([string]$Path, [string]$Kind, [int]$R, [int]$Gv, [int]$B, [in
   }
 }
 
-Save-Bitmap (Join-Path $OutDir "strategy-bg.png") 2400 1350 ${function:Draw-StrategyBackground}
-Save-Bitmap (Join-Path $OutDir "growth-bg.png") 2400 1350 ${function:Draw-GrowthBackground}
+Save-Bitmap (Join-Path $OutDir "strategy-bg-20260621b.png") 2400 1350 ${function:Draw-StrategyBackground}
+Save-Bitmap (Join-Path $OutDir "growth-bg-20260621b.png") 2400 1350 ${function:Draw-GrowthBackground}
 
-Draw-Icon (Join-Path $OutDir "skill-membrane-ripple.png") "skirmisher" 53 216 255 211
-Draw-Icon (Join-Path $OutDir "skill-boring-tendril.png") "engineer" 255 209 102 337
-Draw-Icon (Join-Path $OutDir "skill-spore-core.png") "logistics" 99 212 113 463
-Draw-Icon (Join-Path $OutDir "skill-nerve-gel.png") "courier" 156 141 255 587
-Draw-Icon (Join-Path $OutDir "skill-shell-grains.png") "discipline" 244 180 95 641
-Draw-Icon (Join-Path $OutDir "skill-absorption-vacuole.png") "medic" 255 145 170 739
-Draw-Icon (Join-Path $OutDir "skill-zoc-ring.png") "control" 43 214 163 853
+Draw-Icon (Join-Path $OutDir "skill-membrane-ripple-20260621b.png") "skirmisher" 53 216 255 211
+Draw-Icon (Join-Path $OutDir "skill-boring-tendril-20260621b.png") "engineer" 255 209 102 337
+Draw-Icon (Join-Path $OutDir "skill-spore-core-20260621b.png") "logistics" 99 212 113 463
+Draw-Icon (Join-Path $OutDir "skill-nerve-gel-20260621b.png") "courier" 156 141 255 587
+Draw-Icon (Join-Path $OutDir "skill-shell-grains-20260621b.png") "discipline" 244 180 95 641
+Draw-Icon (Join-Path $OutDir "skill-absorption-vacuole-20260621b.png") "medic" 255 145 170 739
+Draw-Icon (Join-Path $OutDir "skill-zoc-ring-20260621b.png") "control" 43 214 163 853
 
 Write-Host "Generated art assets in $OutDir"

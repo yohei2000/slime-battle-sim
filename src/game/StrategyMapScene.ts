@@ -61,7 +61,7 @@ export class StrategyMapScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.image(STRATEGY_BACKGROUND_KEY, "assets/generated/strategy-bg.png");
+    this.load.image(STRATEGY_BACKGROUND_KEY, "assets/generated/strategy-bg-20260621b.png");
   }
 
   create(): void {
