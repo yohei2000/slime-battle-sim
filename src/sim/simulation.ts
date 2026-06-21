@@ -159,11 +159,7 @@ export class BattleSimulation {
   }
 
   private sideCanStillFight(slimes: ArmySlime[]): boolean {
-    return slimes.some((slime) => {
-      const routedTooLong =
-        slime.isRouting && this.state.elapsed - slime.routedAt >= 8;
-      return slime.morale > 3 && !routedTooLong;
-    });
+    return slimes.some((slime) => slime.morale > 3 && !slime.isRouting);
   }
 
   private finishBattle(winner: BattleState["winner"]): void {
