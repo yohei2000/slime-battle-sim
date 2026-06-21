@@ -1,11 +1,13 @@
 import Phaser from "phaser";
 import { BattleScene } from "./BattleScene";
+import { SlimeGrowthScene } from "./SlimeGrowthScene";
+import { StrategyMapScene } from "./StrategyMapScene";
 
 export const gameConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: "app",
   backgroundColor: "#071118",
-  scene: [BattleScene],
+  scene: [SlimeGrowthScene, StrategyMapScene, BattleScene],
   render: {
     antialias: true,
     roundPixels: false,
