@@ -15,6 +15,7 @@ import {
 } from "./vector";
 import { contactPushForce } from "./slimeCombat";
 import {
+  getMutualZocClearanceScale,
   invalidateZocBoundaryCache,
   projectOutsideEnemyZoc,
   sampleEnemyZoc,
@@ -112,7 +113,11 @@ function localEnemyPressure(
   const contactLoad = patch
     ? clamp01(patch.pressure / 62) * (0.52 + enemy.zocStrength * 0.2)
     : 0;
-  const sample = sampleEnemyZoc(enemy, node.position);
+  const sample = sampleEnemyZoc(
+    enemy,
+    node.position,
+    getMutualZocClearanceScale(enemy, slime, 0),
+  );
   const pressureRange = sample.clearance + 14;
   const zocCompression = sample.insideBody
     ? 1
@@ -264,9 +269,10 @@ function applyDensityForces(slime: ArmySlime, forces: ForceMap): void {
 }
 
 function applyZocForces(slime: ArmySlime, enemy: ArmySlime, forces: ForceMap): void {
+  const clearanceScale = getMutualZocClearanceScale(enemy, slime);
   for (const node of slime.nodes.filter((candidate) => candidate.role !== "interior")) {
     addForce(forces, node, contactPushForce(slime, enemy, node));
-    const sample = sampleEnemyZoc(enemy, node.position);
+    const sample = sampleEnemyZoc(enemy, node.position, clearanceScale);
     const influenceDistance = sample.clearance + 38;
     if (!sample.insideBody && sample.distance >= influenceDistance) continue;
 
@@ -312,20 +318,21 @@ function applyTerrainForces(slime: ArmySlime, forces: ForceMap, bounds: { width:
 
 function enforceZocBoundary(slime: ArmySlime, enemy: ArmySlime): void {
   const contactNormals: Vector2Like[] = [];
+  const clearanceScale = getMutualZocClearanceScale(enemy, slime);
   for (const node of slime.nodes.filter((candidate) => candidate.role !== "interior")) {
-    const sample = sampleEnemyZoc(enemy, node.position);
+    const sample = sampleEnemyZoc(enemy, node.position, clearanceScale);
     if (!sample.insideZoc) continue;
 
     contactNormals.push(sample.outwardNormal);
     const correctionLimit = clamp(
-      22 + Math.max(0, sample.penetration) * 0.72,
-      22,
-      44,
+      34 + Math.max(0, sample.penetration) * 0.95,
+      34,
+      82,
     );
     node.position = projectOutsideEnemyZoc(
       enemy,
       node.position,
-      1,
+      clearanceScale,
       correctionLimit,
     );
     const normalVelocity = dot(node.velocity, sample.outwardNormal);

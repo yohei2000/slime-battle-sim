@@ -160,6 +160,16 @@ export function getZocBoundaryThickness(slime: ArmySlime): number {
   );
 }
 
+export function getMutualZocClearanceScale(
+  enemy: ArmySlime,
+  intruder: ArmySlime,
+  cushion = 1.25,
+): number {
+  const enemyThickness = Math.max(1, getZocBoundaryThickness(enemy));
+  const intruderThickness = getZocBoundaryThickness(intruder);
+  return (enemyThickness + intruderThickness + cushion) / enemyThickness;
+}
+
 function closestSegmentFieldSample(
   segments: ZocFieldSegment[],
   center: Vector2Like,
@@ -211,6 +221,51 @@ export function sampleEnemyZoc(
     clearance,
     penetration,
   };
+}
+
+export function isZocCenterlineOpen(
+  owner: ArmySlime,
+  blockers: ArmySlime[],
+  point: Vector2Like,
+): boolean {
+  return blockers.every((blocker) => {
+    const clearanceScale = getMutualZocClearanceScale(blocker, owner);
+    return !sampleEnemyZoc(blocker, point, clearanceScale).insideZoc;
+  });
+}
+
+export function getExclusiveZocFieldSegments(
+  owner: ArmySlime,
+  blockers: ArmySlime[],
+): ZocFieldSegment[] {
+  const segments = getZocFieldSegments(owner);
+  if (blockers.length === 0) return segments;
+
+  const exclusiveSegments: ZocFieldSegment[] = [];
+  const subdivisionCount = 3;
+  for (const segment of segments) {
+    let previous = { ...segment.start };
+    for (let i = 1; i <= subdivisionCount; i += 1) {
+      const next = {
+        x:
+          segment.start.x +
+          (segment.end.x - segment.start.x) * (i / subdivisionCount),
+        y:
+          segment.start.y +
+          (segment.end.y - segment.start.y) * (i / subdivisionCount),
+      };
+      const midpoint = scale(add(previous, next), 0.5);
+      if (
+        isZocCenterlineOpen(owner, blockers, previous) &&
+        isZocCenterlineOpen(owner, blockers, midpoint) &&
+        isZocCenterlineOpen(owner, blockers, next)
+      ) {
+        exclusiveSegments.push({ start: { ...previous }, end: { ...next } });
+      }
+      previous = next;
+    }
+  }
+  return exclusiveSegments;
 }
 
 export function projectOutsideEnemyZoc(

@@ -17,8 +17,10 @@ import {
   sub,
 } from "../sim/vector";
 import {
+  getExclusiveZocFieldSegments,
   getZocBoundaryThickness,
   getZocFieldSegments,
+  isZocCenterlineOpen,
 } from "../sim/zoc";
 
 const COLORS = {
@@ -95,17 +97,18 @@ export class SlimeOverlay {
     this.particleGraphics.clear();
     this.effectGraphics.clear();
     this.causeLabel?.setVisible(false);
-    for (const slime of slimes) this.drawSlime(slime, time);
+    for (const slime of slimes) this.drawSlime(slime, time, slimes);
     this.updateLabels(slimes);
   }
 
-  private drawSlime(slime: ArmySlime, time: number): void {
+  private drawSlime(slime: ArmySlime, time: number, slimes: ArmySlime[]): void {
     const color = COLORS[slime.side];
     const boundary = getBoundaryNodes(slime);
     const rawPoints = boundary.map((node) => ({ ...node.position }));
     const points = smoothClosed(rawPoints);
 
-    this.drawZocField(slime, boundary, color.zoc);
+    const enemies = slimes.filter((candidate) => candidate.side !== slime.side);
+    this.drawZocField(slime, enemies, boundary, color.zoc);
 
     if (this.shouldDrawAsArms(slime)) {
       this.drawArmBody(slime, boundary, color.fill, color.edge);
@@ -143,10 +146,11 @@ export class SlimeOverlay {
 
   private drawZocField(
     slime: ArmySlime,
+    enemies: ArmySlime[],
     boundary: SlimeNode[],
     zocColor: number,
   ): void {
-    const segments = getZocFieldSegments(slime);
+    const segments = getExclusiveZocFieldSegments(slime, enemies);
     const thickness = getZocBoundaryThickness(slime);
     const fieldWidth = thickness * 1.55;
     const fillAlpha = slime.posture === "envelop" ? 0.035 : 0.032;
@@ -163,6 +167,7 @@ export class SlimeOverlay {
     }
     this.zocGraphics.fillStyle(zocColor, fillAlpha * 0.86);
     for (const node of boundary) {
+      if (!isZocCenterlineOpen(slime, enemies, node.position)) continue;
       this.zocGraphics.fillCircle(
         node.position.x,
         node.position.y,
