@@ -38,11 +38,27 @@ export class GesturePreview {
     if (!this.state.active) return;
 
     if (this.state.mode === "drag" && this.state.start && this.state.end) {
-      this.drawArrow(this.state.start, this.state.end, 0x93f1ff, 10);
+      const color =
+        this.state.focusMode === "breakthrough"
+          ? 0xffd166
+          : this.state.focusMode === "envelop"
+            ? 0x7cecff
+            : 0x93f1ff;
+      this.drawArrow(
+        this.state.start,
+        this.state.targetPoint ?? this.state.end,
+        color,
+        this.state.focusMode === "breakthrough" ? 13 : 10,
+      );
+      if (this.state.targetPoint) {
+        this.drawTargetMarker(this.state.targetPoint, color, this.state.focusMode);
+      }
       this.showLabel(
-        this.state.end.x,
-        this.state.end.y - 20,
-        "軍勢を流す\n命令伝達後に全体移動",
+        (this.state.targetPoint ?? this.state.end).x,
+        (this.state.targetPoint ?? this.state.end).y - 22,
+        this.state.focusMode
+          ? this.copyForFocus(this.state.focusMode)
+          : "軍勢を流す\n命令伝達後に全体移動",
       );
       return;
     }
@@ -75,6 +91,15 @@ export class GesturePreview {
         this.state.mode === "breakthrough" ? 14 : 9,
       );
     }
+    if (this.state.targetPoint) {
+      this.drawArrow(
+        slime.center,
+        this.state.targetPoint,
+        color,
+        this.state.focusMode === "breakthrough" ? 9 : 6,
+      );
+      this.drawTargetMarker(this.state.targetPoint, color, this.state.focusMode);
+    }
 
     if (this.state.mode === "rotate") {
       this.drawRotation(slime, direction, color);
@@ -101,7 +126,9 @@ export class GesturePreview {
     this.showLabel(
       this.state.center.x,
       this.state.center.y - this.state.width * 0.55,
-      this.copyForMode(this.state.mode),
+      this.state.focusMode
+        ? this.copyForFocus(this.state.focusMode)
+        : this.copyForMode(this.state.mode),
     );
   }
 
@@ -199,6 +226,30 @@ export class GesturePreview {
     );
   }
 
+  private drawTargetMarker(
+    point: Vector2Like,
+    color: number,
+    mode?: "breakthrough" | "envelop",
+  ): void {
+    const radius = mode === "breakthrough" ? 22 : 26;
+    this.graphics.lineStyle(3, color, 0.9);
+    this.graphics.strokeCircle(point.x, point.y, radius);
+    this.graphics.lineStyle(2, 0xffffff, 0.82);
+    this.graphics.beginPath();
+    this.graphics.moveTo(point.x - radius * 0.7, point.y);
+    this.graphics.lineTo(point.x + radius * 0.7, point.y);
+    this.graphics.moveTo(point.x, point.y - radius * 0.7);
+    this.graphics.lineTo(point.x, point.y + radius * 0.7);
+    this.graphics.strokePath();
+    if (mode === "envelop") {
+      this.graphics.lineStyle(4, color, 0.58);
+      this.graphics.beginPath();
+      this.graphics.arc(point.x, point.y, radius + 9, -0.85, 0.85, false);
+      this.graphics.arc(point.x, point.y, radius + 9, Math.PI - 0.85, Math.PI + 0.85, false);
+      this.graphics.strokePath();
+    }
+  }
+
   private colorForMode(): number {
     if (this.state.mode === "breakthrough") return 0xffd166;
     if (this.state.mode === "contract") return 0xffa94d;
@@ -227,6 +278,13 @@ export class GesturePreview {
     if (mode === "envelop")
       return "包囲姿勢\n包囲力 +++ / 中央突破リスク +";
     return "展開中\n包囲力 +++ / 局所密度 -- / 突破リスク +";
+  }
+
+  private copyForFocus(mode: "breakthrough" | "envelop"): string {
+    if (mode === "breakthrough") {
+      return "狙点突破\nこの部分を貫く / 圧力集中";
+    }
+    return "狙点包囲\nこの部分を包む / 両翼を回す";
   }
 
   private showLabel(x: number, y: number, text: string): void {

@@ -25,6 +25,7 @@ export class TouchInputController {
     private readonly scene: Phaser.Scene,
     private readonly cameraController: CameraController,
     private readonly getPlayers: () => ArmySlime[],
+    private readonly getEnemies: () => ArmySlime[],
     private readonly getNow: () => number,
     private readonly onPreview: (preview: GesturePreviewState) => void,
   ) {
@@ -52,7 +53,9 @@ export class TouchInputController {
     if (this.ignoreInput) return;
     const world = this.world(pointer);
     const players = this.getPlayers();
+    const enemies = this.getEnemies();
     const touched = players.find((slime) => pointInsideSlime(slime, world, 35));
+    const touchedEnemy = enemies.find((slime) => pointInsideSlime(slime, world, 115));
     if (touched) {
       players.forEach((slime) => {
         slime.isSelected = slime === touched;
@@ -62,7 +65,8 @@ export class TouchInputController {
     const tactical =
       !slime.isRouting &&
       (Boolean(touched) ||
-        (slime.isSelected && pointInsideSlime(slime, world, 75)));
+        (slime.isSelected && pointInsideSlime(slime, world, 75)) ||
+        (slime.isSelected && Boolean(touchedEnemy)));
     this.pointers.set(pointer.id, {
       pointer,
       startScreen: { x: pointer.x, y: pointer.y },
@@ -71,7 +75,9 @@ export class TouchInputController {
       tactical,
     });
 
-    if (this.pointers.size === 1 && tactical) this.drag.begin(world);
+    if (this.pointers.size === 1 && tactical) {
+      this.drag.begin(touchedEnemy && !touched ? slime.center : world, touchedEnemy ? world : undefined);
+    }
     if (this.pointers.size === 2) {
       const records = [...this.pointers.values()];
       if (slime.isSelected && records.some((record) => record.tactical)) {
@@ -94,6 +100,7 @@ export class TouchInputController {
           this.world(records[0].pointer),
           this.world(records[1].pointer),
           slime,
+          this.getEnemies(),
         );
         this.onPreview(this.preview);
       } else {
@@ -110,7 +117,7 @@ export class TouchInputController {
         }
       }
     } else if (record.tactical && slime.isSelected) {
-      this.preview = this.drag.move(this.world(pointer));
+      this.preview = this.drag.move(this.world(pointer), slime, this.getEnemies());
       this.onPreview(this.preview);
     } else {
       this.cameraController.panByScreenDelta({
@@ -128,9 +135,9 @@ export class TouchInputController {
     const wasMulti = this.pointers.size >= 2;
 
     if (wasMulti && slime.isSelected) {
-      this.pinch.commit(slime, this.getNow());
+      this.pinch.commit(slime, this.getNow(), this.getEnemies());
     } else if (record.tactical && slime.isSelected) {
-      const dragged = this.drag.commit(slime, this.getNow());
+      const dragged = this.drag.commit(slime, this.getNow(), this.getEnemies());
       if (!dragged && distance(record.startScreen, { x: pointer.x, y: pointer.y }) < 14) {
         slime.isSelected = true;
       }

@@ -359,6 +359,9 @@ function buildFragment(
     desiredDensity: slime.currentDensity,
     desiredLeftWingAdvance: 0,
     desiredRightWingAdvance: 0,
+    desiredFocusPoint: slime.desiredFocusPoint
+      ? { ...slime.desiredFocusPoint }
+      : undefined,
     baseWidth: extents.width,
     baseDepth: extents.depth,
     currentWidth: extents.width,

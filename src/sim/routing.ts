@@ -32,6 +32,7 @@ export function updateRoutingState(
     slime.routedAt = -1;
     slime.posture = "hold";
     slime.desiredCenter = { ...slime.center };
+    slime.desiredFocusPoint = undefined;
     return;
   }
 
@@ -47,4 +48,5 @@ export function updateRoutingState(
   slime.desiredDensity = 1.12;
   slime.desiredLeftWingAdvance = 0;
   slime.desiredRightWingAdvance = 0;
+  slime.desiredFocusPoint = undefined;
 }

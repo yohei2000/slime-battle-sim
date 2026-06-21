@@ -46,6 +46,7 @@ export class BattleScene extends Phaser.Scene {
       this,
       this.cameraController,
       () => this.simulation.state.playerSlimes,
+      () => this.simulation.state.enemySlimes,
       () => this.simulation.state.elapsed,
       (preview: GesturePreviewState) => this.gesturePreview.setState(preview),
     );

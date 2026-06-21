@@ -51,6 +51,9 @@ export function updateEnemyAI(enemy: ArmySlime, player: ArmySlime, now: number):
         : "breakthrough";
     if (posture === "breakthrough") target = weakPoint(player, enemy);
   }
+  if (posture === "envelop") {
+    target = weakPoint(player, enemy);
+  }
 
   const shape = targetShape(enemy, posture);
   const direction = normalize(sub(target, enemy.center));
@@ -75,6 +78,10 @@ export function updateEnemyAI(enemy: ArmySlime, player: ArmySlime, now: number):
     targetDensity: shape.density,
     targetLeftWingAdvance: wingAdvance,
     targetRightWingAdvance: wingAdvance,
+    targetFocusPoint:
+      posture === "breakthrough" || posture === "envelop"
+        ? target
+        : undefined,
     issuedAt: now,
   });
 }

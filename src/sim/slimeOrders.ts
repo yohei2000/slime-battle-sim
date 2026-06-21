@@ -6,6 +6,7 @@ export function calculateCommandDelay(slime: ArmySlime, order: Omit<SlimeOrder, 
     Math.abs((order.targetWidth ?? slime.desiredWidth) - slime.currentWidth) / 180 +
     Math.abs((order.targetDepth ?? slime.desiredDepth) - slime.currentDepth) / 150 +
     distance(order.targetCenter ?? slime.center, slime.center) / 550 +
+    distance(order.targetFocusPoint ?? slime.desiredFocusPoint ?? slime.center, slime.desiredFocusPoint ?? slime.center) / 620 +
     (Math.abs(order.targetLeftWingAdvance ?? slime.desiredLeftWingAdvance) +
       Math.abs(order.targetRightWingAdvance ?? slime.desiredRightWingAdvance)) /
       260 +
@@ -62,6 +63,11 @@ export function updateOrder(slime: ArmySlime, now: number): void {
       slime.desiredLeftWingAdvance = order.targetLeftWingAdvance;
     if (order.targetRightWingAdvance !== undefined)
       slime.desiredRightWingAdvance = order.targetRightWingAdvance;
+    if (order.targetFocusPoint !== undefined) {
+      slime.desiredFocusPoint = { ...order.targetFocusPoint };
+    } else if (order.posture !== "breakthrough" && order.posture !== "envelop") {
+      slime.desiredFocusPoint = undefined;
+    }
     if (order.posture === "breakthrough") slime.shockTimer = 1.75;
   }
 

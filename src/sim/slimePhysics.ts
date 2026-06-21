@@ -35,6 +35,13 @@ function addForce(forces: ForceMap, node: SlimeNode, force: Vector2Like): void {
 function updateDesiredShape(slime: ArmySlime, enemy: ArmySlime): void {
   const direction = normalize(slime.desiredDirection);
   const lateral = perpendicular(direction);
+  const focusPoint = slime.desiredFocusPoint ?? enemy.center;
+  const focusOffset = sub(focusPoint, enemy.center);
+  const focusSideRatio = clamp(
+    dot(focusOffset, lateral) / Math.max(1, enemy.currentWidth * 0.5),
+    -1,
+    1,
+  );
   const wingCurve = slime.posture === "envelop" ? 0.62 : 0;
   const autoWingAdvance =
     slime.posture === "envelop"
@@ -69,17 +76,35 @@ function updateDesiredShape(slime: ArmySlime, enemy: ArmySlime): void {
       slime.desiredCenter,
       add(scale(direction, forward), scale(lateral, sideways)),
     );
+    if (slime.posture === "breakthrough" && slime.desiredFocusPoint) {
+      const strikeWeight = clamp01((node.shapeU + 0.15) / 1.15);
+      const lanePoint = add(
+        focusPoint,
+        add(
+          scale(
+            direction,
+            -slime.desiredDepth * 0.22 * (1 - clamp01(node.shapeU)),
+          ),
+          scale(lateral, node.shapeV * slime.desiredWidth * 0.18),
+        ),
+      );
+      target = lerp(target, lanePoint, strikeWeight * 0.55);
+    }
     if (slime.posture === "envelop" && Math.abs(node.shapeV) > 0.28) {
       const sideSign = node.shapeV >= 0 ? 1 : -1;
       const wingWeight = clamp01(Math.abs(node.shapeV));
       const frontWeight = clamp01((node.shapeU + 0.15) / 1.15);
+      const sideFocusBoost =
+        1 + Math.max(0, sideSign * focusSideRatio) * 0.35;
       const wrapPoint = add(
-        enemy.center,
+        focusPoint,
         add(
-          scale(direction, enemy.currentDepth * (0.18 + frontWeight * 0.18)),
+          scale(direction, enemy.currentDepth * (0.14 + frontWeight * 0.16)),
           scale(
             lateral,
-            sideSign * (enemy.currentWidth * 0.48 + slime.zocRadius * 0.62),
+            sideSign *
+              (enemy.currentWidth * 0.43 + slime.zocRadius * 0.58) *
+              sideFocusBoost,
           ),
         ),
       );

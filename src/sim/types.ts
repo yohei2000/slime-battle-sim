@@ -77,6 +77,7 @@ export type SlimeOrder = {
   targetDensity?: number;
   targetLeftWingAdvance?: number;
   targetRightWingAdvance?: number;
+  targetFocusPoint?: Vector2Like;
   issuedAt: number;
   executeAt: number;
   status: "queued" | "transmitting" | "executing" | "blocked" | "completed";
@@ -98,6 +99,7 @@ export type ArmySlime = {
   desiredDensity: number;
   desiredLeftWingAdvance: number;
   desiredRightWingAdvance: number;
+  desiredFocusPoint?: Vector2Like;
   baseWidth: number;
   baseDepth: number;
   currentWidth: number;
@@ -165,6 +167,8 @@ export type GesturePreviewState = {
   rotation?: number;
   leftWingAdvance?: number;
   rightWingAdvance?: number;
+  targetPoint?: Vector2Like;
+  focusMode?: "breakthrough" | "envelop";
   confidence?: "高" | "中" | "低";
 };
 
