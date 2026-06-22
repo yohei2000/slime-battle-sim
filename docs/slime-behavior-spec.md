@@ -1,5 +1,7 @@
 # Slime Battle Sim — スライム挙動仕様書
 
+> 世界観の正本は [世界観ガイド](worldview-guide.md) です。この文書の `Slime` / `ArmySlime` は内部実装名です。ユーザー向けには「軍塊」「弾性軍制」「結束線」「制御点」などの人間国家の軍事語彙へ置き換えます。
+
 - 文書種別: ゲーム挙動・シミュレーション仕様
 - 対象実装: `src/sim/`、`src/input/`、`src/ui/SlimeOverlay.ts`
 - 基準日: 2026-06-20
