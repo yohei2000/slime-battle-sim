@@ -40,35 +40,35 @@ export function createInitialCampaignState(): CampaignState {
   const factions: Faction[] = [
     {
       id: "player",
-      name: "Azure Tide",
+      name: "蒼潮連邦",
       color: 0x35d8ff,
       accentColor: "#7cecff",
       battleStyle: "包囲と粘り",
     },
     {
       id: "verdant",
-      name: "Verdant Brood",
+      name: "深森同盟",
       color: 0x63d471,
       accentColor: "#9aff9f",
       battleStyle: "補充重視",
     },
     {
       id: "amber",
-      name: "Amber Compact",
+      name: "琥珀関門同盟",
       color: 0xf4b45f,
       accentColor: "#ffd18a",
       battleStyle: "防衛と条約",
     },
     {
       id: "salt",
-      name: "Salt Choir",
+      name: "塩湖公国",
       color: 0xf15d6a,
       accentColor: "#ff91aa",
       battleStyle: "突破と消耗戦",
     },
     {
       id: "glass",
-      name: "Glass Remnant",
+      name: "硝子遺領",
       color: 0x9c8dff,
       accentColor: "#c5bdff",
       battleStyle: "硬質少数",
@@ -201,7 +201,7 @@ export function createInitialCampaignState(): CampaignState {
     diplomacyUsed: false,
     reports: [
       "戦略マップを展開しました",
-      "深森前線では Verdant Brood が境界を押しています",
+      "深森前線では深森同盟が境界を押しています",
       "内政と外交を1手ずつ試せます",
     ],
   };
@@ -507,7 +507,7 @@ export function canUseDiplomacyAction(
 }
 
 export function resourceText(resources: RegionResources): string {
-  return `糧秣 ${resources.nutrient}  斥候 ${resources.spores}  工材 ${resources.gel}  甲材 ${resources.shell}  記録 ${resources.memory}`;
+  return `糧秣 ${resources.nutrient}  予備 ${resources.spores}  工兵材 ${resources.gel}  装甲材 ${resources.shell}  参謀知 ${resources.memory}`;
 }
 
 function relation(
@@ -574,7 +574,7 @@ function terrainBattleNotes(terrain: TerrainType): string[] {
   if (terrain === "forest") return ["深森: 結束が戻りやすいが、接触線が乱れやすい"];
   if (terrain === "cavern") return ["石灰洞: 戦線幅が狭く、包囲が難しい"];
   if (terrain === "salt") return ["塩湖: 初期疲労が増え、長期戦が危険"];
-  if (terrain === "ruin") return ["廃墟: 甲材と記録資源が多く、防御的な敵が出やすい"];
+  if (terrain === "ruin") return ["廃墟: 装甲材と参謀知が多く、防御的な敵が出やすい"];
   return ["草原: 幅を取りやすく、包囲と突破の両方が起きる"];
 }
 

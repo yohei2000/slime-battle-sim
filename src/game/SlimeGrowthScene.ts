@@ -263,7 +263,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
     this.addText(
       18,
       compact ? 42 : 45,
-      `Army Lv.${this.growth.slimeLevel}  改革案 ${this.growth.wave}`,
+      `軍制 Lv.${this.growth.slimeLevel}  改革案 ${this.growth.wave}`,
       13,
       "#9df1ff",
       700,
@@ -293,7 +293,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
   }
 
   private drawCore(compact: boolean): void {
-    this.frame(this.coreRect, "軍制スロット");
+    this.frame(this.coreRect, "教範・組織枠");
     this.animatedSlotPoints = [];
     const graphics = this.add.graphics().setDepth(1);
     const center = {
@@ -334,7 +334,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
     this.addText(
       this.coreRect.x + 18,
       this.coreRect.y + this.coreRect.height - (compact ? 46 : 54),
-      `軍型: ${buildArchetype(this.growth)}\n候補を選ぶたび、軍制スロットが採用または強化されます`,
+      `軍型: ${buildArchetype(this.growth)}\n候補を選ぶたび、教範枠が採用または強化されます`,
       compact ? 12 : 13,
       "#f4fbff",
       500,
@@ -343,7 +343,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
   }
 
   private drawMobileSlotStrip(): void {
-    this.frame(this.coreRect, "軍制スロット");
+    this.frame(this.coreRect, "教範・組織枠");
     const shortScreen = this.scale.height < 720;
     const x = this.coreRect.x + (shortScreen ? 14 : 16);
     const y = this.coreRect.y + (shortScreen ? 34 : 38);
@@ -586,7 +586,7 @@ export class SlimeGrowthScene extends Phaser.Scene {
     this.addText(
       x,
       y,
-      "スロットは魔法ではなく、国家が整える軍制です。人間の訓練・兵站・指揮が、戦場では広がる/固まる/割れる挙動として表れます。",
+      "教範枠は魔法ではなく、国家が整える軍制です。訓練・兵站・指揮が、戦場では展開/密集/分断耐性として表れます。",
       13,
       "#eafaff",
       500,
@@ -681,15 +681,15 @@ export class SlimeGrowthScene extends Phaser.Scene {
     const artSize = compact ? Math.min(shortScreen ? 54 : 62, height - 20) : Math.min(104, height - 42);
     const leftPad = compact ? (shortScreen ? 76 : 84) : 118;
     const textWidth = Math.max(116, width - leftPad - (compact ? 22 : 28));
-    const textColor = "#172934";
-    const mutedText = "#38515c";
+    const textColor = "#06121a";
+    const mutedText = "#1c3741";
     const cardImage = this.add
       .image(x + width / 2, y + height / 2, GROWTH_DOCTRINE_CARD_KEY)
       .setDisplaySize(width + (compact ? 10 : 18), height + (compact ? 18 : 30))
       .setAlpha(0.98)
       .setDepth(3.8);
     const parchmentVeil = this.add
-      .rectangle(x + leftPad - 10, y + 16, width - leftPad - 4, height - 30, 0xf0dcb0, 0.2)
+      .rectangle(x + leftPad - 10, y + 16, width - leftPad - 4, height - 30, 0xf7e4b8, 0.46)
       .setOrigin(0)
       .setDepth(4.1);
     const background = this.add
@@ -737,8 +737,8 @@ export class SlimeGrowthScene extends Phaser.Scene {
 
     const dense = compact && height < 112;
     const textX = x + leftPad;
-    this.addText(textX, y + (shortScreen ? 10 : compact ? 12 : 18), `${choiceKindLabel(choice)} / ${definition.organ}`, 12, definition.accent, 700, textWidth).setDepth(6);
-    this.addText(textX, y + (shortScreen ? 27 : compact ? 31 : 42), definition.name, dense ? (shortScreen ? 14 : 15) : compact ? 16 : 18, textColor, 700, textWidth).setDepth(6);
+    this.addCardText(textX, y + (shortScreen ? 9 : compact ? 11 : 18), `${choiceKindLabel(choice)} / ${definition.organ}`, 13, definition.accent, 700, textWidth).setDepth(6);
+    this.addCardText(textX, y + (shortScreen ? 27 : compact ? 31 : 42), definition.name, dense ? 16 : compact ? 17 : 18, textColor, 700, textWidth).setDepth(6);
 
     const lineStart = y + (shortScreen ? 52 : compact ? (dense ? 58 : 64) : 76);
     const lineGap = shortScreen ? 16 : compact ? 18 : 22;
@@ -765,8 +765,8 @@ export class SlimeGrowthScene extends Phaser.Scene {
     labelColor: string,
     textColor = "#cdefff",
   ): void {
-    this.addText(x, y, label, 12, labelColor, 700, 42).setDepth(6);
-    this.addText(x + (compact ? 42 : 46), y, text, compact ? 12 : 13, textColor, 500, width - 48).setDepth(6);
+    this.addCardText(x, y, label, 13, labelColor, 700, 42).setDepth(6);
+    this.addCardText(x + (compact ? 42 : 46), y, text, compact ? 13 : 13, textColor, 600, width - 48).setDepth(6);
   }
 
   private frame(rect: Rect, title: string): void {
@@ -896,7 +896,30 @@ export class SlimeGrowthScene extends Phaser.Scene {
       lineSpacing: 3,
       wordWrap: wrapWidth ? { width: wrapWidth, useAdvancedWrap: true } : undefined,
     });
+    object.setResolution(2);
     object.setShadow(0, 2, "#001018", 4, true, true);
+    this.objects.push(object);
+    return object;
+  }
+
+  private addCardText(
+    x: number,
+    y: number,
+    text: string,
+    size: number,
+    color: string,
+    weight: number,
+    wrapWidth?: number,
+  ): Phaser.GameObjects.Text {
+    const object = this.add.text(x, y, text, {
+      fontFamily: "Inter, Noto Sans JP, sans-serif",
+      fontSize: `${Math.max(size, 13)}px`,
+      color,
+      fontStyle: weight >= 700 ? "bold" : "normal",
+      lineSpacing: 3,
+      wordWrap: wrapWidth ? { width: wrapWidth, useAdvancedWrap: true } : undefined,
+    });
+    object.setResolution(2);
     this.objects.push(object);
     return object;
   }

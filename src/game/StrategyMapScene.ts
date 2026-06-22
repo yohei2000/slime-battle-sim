@@ -177,7 +177,7 @@ export class StrategyMapScene extends Phaser.Scene {
       18,
       42,
       compactHeader
-        ? `T${this.state.turn}  糧${this.state.resources.nutrient} 偵${this.state.resources.spores} 工${this.state.resources.gel} 甲${this.state.resources.shell} 記${this.state.resources.memory}`
+        ? `T${this.state.turn}  ${this.compactResourceText("line")}`
         : `Turn ${this.state.turn}`,
       compactHeader ? 12 : 13,
       "#7cecff",
@@ -186,7 +186,7 @@ export class StrategyMapScene extends Phaser.Scene {
     );
     const compactResources =
       compactHeader
-        ? `糧${this.state.resources.nutrient} 偵${this.state.resources.spores} 工${this.state.resources.gel}\n甲${this.state.resources.shell} 記${this.state.resources.memory}`
+        ? this.compactResourceText("stack")
         : resourceText(this.state.resources);
     if (!compactHeader) {
       this.addText(
@@ -499,7 +499,7 @@ export class StrategyMapScene extends Phaser.Scene {
     compact: boolean,
   ): void {
     const text =
-      `${preview.title} / 目的 ${preview.objective}\n` +
+      `${preview.title} / 作戦 ${this.objectiveLabel(preview.objective)}\n` +
       `自軍 兵${preview.playerInitial.mass} 士${preview.playerInitial.morale} 結${preview.playerInitial.cohesion} 疲${preview.playerInitial.fatigue}\n` +
       `敵軍 兵${preview.enemyInitial.mass} 士${preview.enemyInitial.morale} 結${preview.enemyInitial.cohesion} 疲${preview.enemyInitial.fatigue}\n` +
       (compact
@@ -552,6 +552,20 @@ export class StrategyMapScene extends Phaser.Scene {
     if (type === "passage") return "通行";
     if (type === "supply") return "補給";
     return "不可侵";
+  }
+
+  private objectiveLabel(objective: BattlePreview["objective"]): string {
+    if (objective === "Hold") return "防衛維持";
+    if (objective === "Breakthrough") return "突破侵攻";
+    if (objective === "Escape") return "撤収";
+    return "敵軍撃退";
+  }
+
+  private compactResourceText(mode: "line" | "stack"): string {
+    const resources = this.state.resources;
+    const top = `糧${resources.nutrient} 予${resources.spores} 工${resources.gel}`;
+    const bottom = `甲${resources.shell} 参${resources.memory}`;
+    return mode === "line" ? `${top} ${bottom}` : `${top}\n${bottom}`;
   }
 
   private regionPoint(region: RegionNode): { x: number; y: number } {
@@ -626,6 +640,7 @@ export class StrategyMapScene extends Phaser.Scene {
       lineSpacing: 3,
       wordWrap: wrapWidth ? { width: wrapWidth, useAdvancedWrap: true } : undefined,
     });
+    object.setResolution(2);
     object.setShadow(0, 2, "#001018", 4, true, true);
     this.objects.push(object);
     return object;
