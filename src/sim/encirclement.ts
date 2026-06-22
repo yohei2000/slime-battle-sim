@@ -27,7 +27,7 @@ export function flankAccess(attacker: ArmySlime, defender: ArmySlime): number {
 export function updateEncirclement(attacker: ArmySlime, defender: ArmySlime, dt: number): void {
   const range = distance(attacker.center, defender.center);
   const reach = attacker.currentWidth * 0.68 + defender.currentWidth * 0.32;
-  const postureBonus = attacker.posture === "envelop" ? 1.08 : attacker.posture === "spread" ? 0.36 : 0;
+  const postureBonus = attacker.posture === "envelop" ? 0.84 : attacker.posture === "spread" ? 0.26 : 0;
   const access = flankAccess(attacker, defender);
   const integrity = ringIntegrity(attacker);
   const widthCoverage = clamp01(
@@ -44,24 +44,24 @@ export function updateEncirclement(attacker: ArmySlime, defender: ArmySlime, dt:
   );
   const wrapAccess = Math.max(access, widthCoverage * 0.62);
   const wrapMotion = 0.72 + wingAdvance * 0.42 + contactGrip * 0.22;
-  const attackerBalance = attacker.side === "player" ? 1.18 : 0.72;
+  const attackerBalance = attacker.side === "player" ? 0.98 : 0.92;
   const gain =
     range < reach + 165
-      ? postureBonus * wrapAccess * integrity * wrapMotion * 0.27 * attackerBalance
+      ? postureBonus * wrapAccess * integrity * wrapMotion * 0.11 * attackerBalance
       : 0;
   defender.encirclement = clamp01(
-    defender.encirclement + gain * dt - (gain === 0 ? 0.032 * dt : 0),
+    defender.encirclement + gain * dt - (gain === 0 ? 0.045 * dt : 0),
   );
   defender.isEncircled = defender.encirclement > 0.56;
   attacker.isEncircling = defender.encirclement > 0.16;
 
   if (defender.encirclement > 0.22) {
     const pressure = defender.encirclement;
-    const defenderVulnerability = defender.side === "enemy" ? 1.18 : 0.78;
+    const defenderVulnerability = defender.side === "enemy" ? 1.0 : 0.9;
     defender.morale = clamp(
       defender.morale -
         pressure *
-          (defender.isEncircled ? 2.8 : 1.85) *
+          (defender.isEncircled ? 1.0 : 0.5) *
           defenderVulnerability *
           dt,
       0,
@@ -70,7 +70,7 @@ export function updateEncirclement(attacker: ArmySlime, defender: ArmySlime, dt:
     defender.fatigue = clamp(
       defender.fatigue +
         pressure *
-          (defender.isEncircled ? 2.25 : 1.35) *
+          (defender.isEncircled ? 1.05 : 0.58) *
           defenderVulnerability *
           dt,
       0,
@@ -93,7 +93,7 @@ export function updateEncirclement(attacker: ArmySlime, defender: ArmySlime, dt:
     if (defender.encirclement > 0.48) {
       defender.cohesion = clamp(
         defender.cohesion -
-          (defender.encirclement - 0.38) * 2.1 * defenderVulnerability * dt,
+          (defender.encirclement - 0.38) * 0.86 * defenderVulnerability * dt,
         0,
         100,
       );

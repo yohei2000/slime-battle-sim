@@ -1,9 +1,8 @@
 import type { ArmySlime } from "./types";
 import { add, clamp, normalize, scale, sub } from "./vector";
 
-export const ROUT_MORALE_THRESHOLD = 25;
+export const ROUT_MORALE_THRESHOLD = 24;
 export const RALLY_MORALE_THRESHOLD = 38;
-const ROUT_COHESION_THRESHOLD = 4;
 const MIN_ROUT_SECONDS = 8;
 
 export function updateRoutingState(
@@ -11,17 +10,11 @@ export function updateRoutingState(
   enemy: ArmySlime,
   now: number,
 ): void {
-  const moraleThreshold =
-    slime.side === "enemy" ? ROUT_MORALE_THRESHOLD + 6 : ROUT_MORALE_THRESHOLD - 3;
-  const cohesionThreshold =
-    slime.side === "enemy" ? ROUT_COHESION_THRESHOLD + 4 : ROUT_COHESION_THRESHOLD;
+  const moraleThreshold = ROUT_MORALE_THRESHOLD;
   const rallyThreshold =
-    slime.side === "enemy" ? RALLY_MORALE_THRESHOLD + 6 : RALLY_MORALE_THRESHOLD - 3;
-  if (
-    !slime.isRouting &&
-    (slime.morale <= moraleThreshold ||
-      slime.cohesion <= cohesionThreshold)
-  ) {
+    slime.side === "enemy" ? RALLY_MORALE_THRESHOLD : RALLY_MORALE_THRESHOLD - 1;
+  const moraleBroken = slime.morale <= moraleThreshold;
+  if (!slime.isRouting && moraleBroken) {
     slime.isRouting = true;
     slime.routedAt = now;
     slime.activeOrder = undefined;

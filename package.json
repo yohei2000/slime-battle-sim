@@ -7,6 +7,7 @@
     "dev": "vite --base=./",
     "build": "tsc -b && vite build --base=./",
     "preview": "vite preview --base=./",
+    "balance": "node scripts/run-balance.mjs",
     "smoke:visual": "node scripts/visual-smoke.mjs"
   },
   "dependencies": {

@@ -56,7 +56,7 @@ export function createArmySlime(
   const lateral = perpendicular(direction);
   const width = options.width ?? 250;
   const depth = options.depth ?? 180;
-  const mass = options.mass ?? (side === "player" ? 104 : 92);
+  const mass = options.mass ?? (side === "player" ? 98 : 106);
   const particleCount = options.particleCount ?? PARTICLE_COUNT;
   const nodes: SlimeNode[] = [];
   const links: SlimeLink[] = [];
@@ -222,9 +222,9 @@ export function createArmySlime(
     currentDepth: depth,
     currentDensity: 1,
     mass,
-    morale: side === "player" ? 88 : 76,
-    cohesion: side === "player" ? 90 : 78,
-    fatigue: side === "player" ? 5 : 14,
+    morale: side === "player" ? 80 : 88,
+    cohesion: side === "player" ? 82 : 88,
+    fatigue: side === "player" ? 8 : 6,
     pressure: 0,
     elasticity: 0.58,
     viscosity: 0.62,
@@ -249,8 +249,8 @@ export function createArmySlime(
     aiThinkAt: 0,
     linkIntegrity: 1,
     brokenLinkRatio: 0,
-    toughness: side === "player" ? 0.72 : 0.62,
-    effectiveToughness: side === "player" ? 0.72 : 0.62,
+    toughness: side === "player" ? 0.64 : 0.72,
+    effectiveToughness: side === "player" ? 0.64 : 0.72,
     peakLocalStress: 0,
     fractureConcentration: 0,
     fractureLinkCount: 0,

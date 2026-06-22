@@ -22,7 +22,7 @@ import {
 
 const MAX_SPLIT_GENERATION = 2;
 const MIN_SPLIT_MASS = 58;
-const REQUIRED_LOCAL_BREAKS = 5;
+const REQUIRED_LOCAL_BREAKS = 7;
 const MIN_CHILD_NODES = 8;
 const MIN_CHILD_BOUNDARY_NODES = 3;
 
@@ -133,8 +133,8 @@ export function shouldSplitSlime(slime: ArmySlime): boolean {
     slime.splitCooldown <= 0 &&
     slime.splitGeneration < MAX_SPLIT_GENERATION &&
     slime.mass >= MIN_SPLIT_MASS &&
-    slime.splitStress >= 0.93 &&
-    slime.fractureConcentration >= 0.86 &&
+    slime.splitStress >= 0.985 &&
+    slime.fractureConcentration >= 0.94 &&
     slime.fractureLinkCount >= REQUIRED_LOCAL_BREAKS
   );
 }

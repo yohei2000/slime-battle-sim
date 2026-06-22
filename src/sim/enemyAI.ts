@@ -3,9 +3,9 @@ import { flankAccess } from "./encirclement";
 import { issueOrder } from "./slimeOrders";
 import { add, clamp, normalize, perpendicular, scale, sub } from "./vector";
 
-const ENEMY_AI_MISTAKE_RATE = 0.34;
-const ENEMY_AI_BLUNDER_RATE = 0.12;
-const ENEMY_AI_AIM_ERROR_RATIO = 0.28;
+const ENEMY_AI_MISTAKE_RATE = 0.24;
+const ENEMY_AI_BLUNDER_RATE = 0.06;
+const ENEMY_AI_AIM_ERROR_RATIO = 0.24;
 
 type EnemyDecision = {
   posture: SlimePosture;
@@ -106,13 +106,19 @@ export function updateEnemyAI(enemy: ArmySlime, player: ArmySlime, now: number):
   let posture: SlimePosture = "neutral";
   let target = player.center;
 
-  if (enemy.cohesion < 35 || enemy.morale < 30) {
-    posture = "retreat";
-    target = add(enemy.center, scale(normalize(sub(enemy.center, player.center)), 180));
-  } else if (enemy.isEncircled) {
+  if (enemy.isEncircled || enemy.encirclement > 0.36) {
     posture = "breakthrough";
     target = weakPoint(player, enemy);
-  } else if (player.gapRisk > 0.76 && player.envelopPower < 0.5) {
+  } else if (enemy.gapRisk > 0.68 || enemy.splitStress > 0.32) {
+    posture = "contract";
+    target = add(enemy.center, scale(normalize(sub(player.center, enemy.center)), 38));
+  } else if (enemy.cohesion < 35 || enemy.morale < 30) {
+    posture = "retreat";
+    target = add(enemy.center, scale(normalize(sub(enemy.center, player.center)), 180));
+  } else if (
+    player.gapRisk > 0.66 ||
+    (player.currentWidth > player.baseWidth * 1.34 && player.currentDensity < 0.96)
+  ) {
     posture = "breakthrough";
     target = weakPoint(player, enemy);
   } else if (player.currentDensity > 1.28 && access > 0.22) {

@@ -595,6 +595,17 @@ function updateDerivedStats(slime: ArmySlime, dt: number): void {
     slime.fatigue += slime.crowding * 6.8 * compactPosturePenalty * dt;
     slime.cohesion -= slime.crowding * 7.5 * compactPosturePenalty * dt;
   }
+  if (
+    (slime.posture === "spread" || slime.posture === "envelop") &&
+    slime.gapRisk > 0.52
+  ) {
+    const exposedLineLoad = (slime.gapRisk - 0.52) * (slime.isEngaged ? 1.45 : 0.72);
+    slime.fatigue += exposedLineLoad * 5.6 * dt;
+    slime.cohesion -= exposedLineLoad * 6.4 * dt;
+    if (slime.isEngaged && slime.gapRisk > 0.68) {
+      slime.morale -= (slime.gapRisk - 0.68) * 8 * dt;
+    }
+  }
   if (slime.posture === "breakthrough") {
     const breakthroughLoad = slime.isEngaged ? 1.55 : 0.85;
     slime.fatigue += (0.95 + slime.crowding * 3.2) * breakthroughLoad * dt;
